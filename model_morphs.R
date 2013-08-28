@@ -266,20 +266,19 @@ model <- function(alpha, utt.cost, thetaGtr, label) {
   dev.off()
 }
 
-#graph data and save plot -- CHECK THIS!
-sapply( c("down", "mid", "unif"), function(dist) {
-  h <- 0.09
-  kernel.est <- est.kernel(dist, h)
-  dens <- make.pdf(kernel.est)
-  int <- make.cdf(kernel.est)
-  x <- seq(-1, 2, 0.01)
-  int.y <- sapply(x, int)
-  dens.y <- sapply(x, dens)
-  plot(x,int.y,ylim=c(0,5), ylab="", xlab="", type="l")
-  par(new=T)
-  plot(x,dens.y, ylim=c(0,5), ylab="", xlab="", type="l")
-  print(integrate(function(x){return(sapply(x, dens))}, lower=-0.1, upper=1.1))
-})
+# sapply( c("down", "mid", "unif"), function(dist) {
+#   h <- 0.09
+#   kernel.est <- est.kernel(dist, h)
+#   dens <- make.pdf(kernel.est)
+#   int <- make.cdf(kernel.est)
+#   x <- seq(-1, 2, 0.01)
+#   int.y <- sapply(x, int)
+#   dens.y <- sapply(x, dens)
+#   plot(x,int.y,ylim=c(0,5), ylab="", xlab="", type="l")
+#   par(new=T)
+#   plot(x,dens.y, ylim=c(0,5), ylab="", xlab="", type="l")
+#   print(integrate(function(x){return(sapply(x, dens))}, lower=-0.1, upper=1.1))
+# })
 
 #run the model with different values of free parameters
 model(alpha=1, utt.cost=2, thetaGtr=T, label="output/alpha1cost2thetaGtr")
