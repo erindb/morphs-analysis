@@ -255,10 +255,23 @@ z.other.dist <- c(sapply(good.subjects, function(s) {
 }))
 z.data <- data.frame(subj=z.subj, dist=z.dist, mod=z.mod, mp=z.mp, other.dist=z.other.dist)
 # 
-################ anova
-adj.anova <- aov(mp ~ dist*mod, data=good.data)
-print(summary(adj.anova))
-# 
+################ anovas
+raw.lm <- lm(mp ~ dist*mod, data=good.data)
+raw.anova <- anova(raw.lm)#aov(mp ~ dist*mod, data=good.data)
+print(raw.anova)
+
+othercat.lm <- lm(mp ~ dist*mod*other.dist, data=good.data)
+othercat.anova <- anova(othercat.lm)
+print(othercat.anova)
+
+z.lm <- lm(mp ~ dist*mod, data=z.data)
+z.anova <- anova(z.lm)#aov(mp ~ dist*mod, data=good.data)
+print("z-scored:")
+print(z.anova)
+
+zothercat.lm <- lm(mp ~ dist*mod*other.dist, data=z.data)
+zothercat.anova <- anova(zothercat.lm)
+print(zothercat.anova)
 ################ graph
 mygraph <- function(mydata, range, mytitle) {
   avg.data <- aggregate(mp ~ dist + mod, data = mydata, FUN = mean)
@@ -312,4 +325,4 @@ mygraph <- function(mydata, range, mytitle) {
 }
 
 mygraph(good.data, c(0,1), "Novel Adj Scale")
-mygraph(z.data, c(-1.5,1.5), "Novel Adj Scale (zscored)")
+mygraph(z.data, c(-1.5,1.5), "Novel Adj Scale (z-scored)")
