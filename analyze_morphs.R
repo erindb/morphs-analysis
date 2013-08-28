@@ -2,8 +2,8 @@
 #install.packages(c("R.basic"), contriburl="http://www.braju.com/R/repos/")
 library(rjson)
 library(stats)
-library(plyr)
-library(R.basic)
+#library(plyr)
+#library(R.basic)
 
 #get rid of first and last quotes. for some reason there are a bunch in my data :/ oops!
 cutQuotes <- function(quoteyString) {
@@ -13,7 +13,7 @@ cutQuotes <- function(quoteyString) {
 }
 
 ################# reading and cleaning data for all pieces
-setwd("~/Code/cocolab/running_experiments/2013-8-27_morphs_exp")
+setwd("~/Code/cocolab/analyzing_experiments/morphs-analysis/")  ###change this to actual location of repo
 rd <- read.table("morphs.results", sep="\t", quote='"', header=TRUE)
 
 adjectives <- lapply(as.character(rd$Answer.adjective), cutQuotes)
@@ -72,6 +72,15 @@ distributions <- c(sapply(1:ntargets, function(i){
   return(dists)
 }))
 
+other.distributions <- c(sapply(1:ntargets, function(i){
+  df <- targets[[i]] #target data for this subj
+  nounlist <- nounlists[[i]] #noun list for this subj
+  distlist <- distlists[[i]] #dist list for this subj
+  adj <- adjectives[[i]] #adjective for this subj
+  dists <- c(sapply(rev(distlist), function(x){return(rep(x,3))}))
+  return(dists)
+}))
+
 subjects <- c(sapply(1:ntargets, function(i){
   subj <- subjects[[i]]
   return(rep(subj, 6))
@@ -105,46 +114,9 @@ target.data <- data.frame(subj=subjects, #worker id
                           dist=distributions, #where the distribution is peaked (down, mid, or unif)
                           mp=responses, #degree modifier (very, adj, none)
                           mod=modifiers, #morph proportion of chosen picture
-                          rt=reactions) #reaction time for ENTIRE target section
+                          rt=reactions, #reaction time for ENTIRE target section
+                          other.dist=other.distributions) #other distribution this subj saw
 
-# #################### get metadata on subjects
-# # what shapes they saw
-# # what color each shape was
-# # what order they saw objects in
-# # what names the objects were given
-# # whether and how much they played with the adjective slider in the beginning
-# # etc.
-# 
-# sliderPractice <- lapply(as.character(rd[["Answer.sliderPractice"]]), fromJSON)
-# most <- lapply(as.character(rd$Answer.most), fromJSON)
-# least <- lapply(as.character(rd$Answer.least), fromJSON)
-# comments <- unlist( lapply( as.character(rd$Answer.comments), cutQuotes))
-# language <- unlist( lapply(tolower(as.character(rd$Answer.language)), cutQuotes))
-# 
-# meta.data <- data.frame(subj = subjects,
-#                         windowWidth = as.integer(rd$Answer.windowWidth),
-#                         sliderPracticeMin = as.numeric(lapply(sliderPractice, getVal("min"))),
-#                         sliderPracticeMax = as.numeric(lapply(sliderPractice, getVal("max"))),
-#                         language = as.factor(language),
-#                         leastLabel = as.factor( unlist(lapply(least, getVal("label")))),
-#                         mostLabel = as.factor( unlist(lapply(most, getVal("label")))),
-#                         age = as.integer(lapply(as.character(rd$Answer.age), cutQuotes)),
-#                         # because I logged the data in the wrong direction, the noun whose
-#                         # distribution is peaked up, which I call "mostNoun" is actually indexed in
-#                         # the results as "least", and vice versa.
-#                         mostNoun = as.factor( unlist( lapply(nounlists, getVal("least")))),
-#                         leastNoun = as.factor( unlist( lapply(nounlists, getVal("most")))),
-#                         midNoun = as.factor( unlist( lapply(nounlists, getVal("mid")))),
-#                         adjective = as.factor(unlist(adjectives)),
-#                         comments = as.factor(unlist(comments)),
-#                         #order nouns are displayed from top to bottom where 0 is least and 2 is most
-#                         warmupTableDisplayOrder = as.factor( rd$Answer.warmupIndices)
-#                         )
-# 
-# write.table(meta.data, "meta.data")
-# 
-# 
-# 
 #################### get subjects' responses to warmup questions
 warmups <- lapply( as.character(rd$Answer.warmups), fromJSON)
 
@@ -245,13 +217,8 @@ warmup.data$correctness <- as.numeric(warmup.data$correctness)
 
 exclusion.list <- c()
 
-# # based on comments
-# confused.comment <- "I+was+confused+on+the+last+slide+but+I+did+my+best+to+try+and+understand+what+the+slider+was+meant+to+judge.+"
-# unsure.comment <- "think+i+reversed+spiff+and+gub+not+sure."
-# exclusion.list <- c(exclusion.list, as.character(subjects[meta.data$comment == confused.comment]))
-# exclusion.list <- c(exclusion.list, as.character(subjects[meta.data$comment == unsure.comment]))
-
 # based on warmups
+# change this to how well they did on the obvious ones
 avg.correct <-aggregate(x=as.numeric(warmup.data$correctness)[warmup.data$type == "compare"],
                         by=list(warmup.data$subj[warmup.data$type == "compare"]), FUN="mean")
 exclusion.list <- c(exclusion.list, as.character(avg.correct$Group.1[avg.correct$x < 0.5]))
@@ -273,7 +240,7 @@ good.data$rt <- as.numeric(good.data$rt)
 #   subj.z <- scale(subj.data$mp)
 #   z <- c(z, subj.z)
 # }
-z.data <- data.frame(subj=good.data$subj, dist=good.data$dist, mod=good.data$mod, mp=z)
+#z.data <- data.frame(subj=good.data$subj, dist=good.data$dist, mod=good.data$mod, mp=z)
 # #z.means <- aggregate(z ~ dist + mod, data = z.data, FUN = mean)
 # 
 ################ anova
@@ -308,7 +275,6 @@ mygraph <- function(mydata, range, mytitle) {
   ### confidence intervals
   dists <- c("down", "mid", "unif")
   mods <- c("none", "adj", "very")
-  print(summary(mydata))
   conf.ints <- lapply(dists, function(dist) {
     return(lapply(mods, function(mod) {
       sub.subjs <- mydata$subj[mydata$mod == mod & mydata$dist == dist]
@@ -334,62 +300,3 @@ mygraph <- function(mydata, range, mytitle) {
 }
 
 mygraph(good.data, c(0,1), "Novel Adj Scale")
-# mygraph(z.data, c(-2,2), "z-scored novel adj scale")
-# 
-# lapply(good.subjects, function(s) {
-#   png(paste(c("subjects/", as.character(s)), collapse=""), 600, 400)
-#   a <- good.data$mp[good.data$subj == s]
-#   gd <- matrix(a, nrow=3, ncol=3,
-#                dimnames=list(c("none", "adj", "very"),
-#                              c("peakedDown", "peakedMid", "peakedUp")))
-#   g <- barplot(gd, main=as.character(s),
-#                ylab="feppiness", beside=TRUE, col=rainbow(3), ylim=c(0,1))
-#   legend("topleft", c("wug", "feppy wug", "very feppy wug"), cex=0.6, bty="n", fill=rainbow(3));
-#   dev.off()
-# })
-# 
-# #################model output
-# model.data <- lapply(0:9, function(i) {
-#   filename <- paste(c('model-data/data_gtr', i), collapse='')
-#   return(read.table(filename))
-# })
-# 
-# mean.model <- matrix(rep(0,9), nrow=3, ncol=3,
-#                dimnames=list(c("none", "adj", "very"),
-#                              c("peakedDown", "peakedMid", "peakedUp")))
-# lower.model <- matrix(rep(0,9), nrow=3, ncol=3,
-#                dimnames=list(c("none", "adj", "very"),
-#                              c("peakedDown", "peakedMid", "peakedUp")))
-# higher.model <- matrix(rep(0,9), nrow=3, ncol=3,
-#                 dimnames=list(c("none", "adj", "very"),
-#                               c("peakedDown", "peakedMid", "peakedUp")))
-# for (row in 1:3) {
-#   for (col in 1:3) {
-#     model.runs <- rep(0,10)
-#     for (s in 1:10) {
-#       model.runs[s] <- model.data[[s]][row,col]
-#     }
-#     mean.model[row,col] <- mean(model.runs)
-#     sample.means <- replicate(100, mean(sample(model.runs, 10, replace=TRUE)))
-#     conf <- quantile(sample.means, c(0.025, 0.975))
-#     lower.model[row,col] <- conf[[1]]
-#     higher.model[row,col] <- conf[[2]]
-#   }
-# }
-# 
-# png("model", 600, 400)
-# model.bar <- barplot((mean.model), main="Novel Adj Model (very > adj)",
-#                          ylab="feppiness", beside=TRUE, col=rainbow(3), ylim=c(0,1))
-# legend("topleft", c("wug", "feppy wug", "very feppy wug"), cex=0.6, bty="n", fill=rainbow(3));
-# 
-# ### confidence intervals
-# error.bar(model.bar, as.matrix(mean.model), higher.model, lower.model)
-# dev.off()
-# 
-# getTime <- function(elem) {
-#   timey.wimey <- strsplit(as.character(elem), " ")[[1]][4]
-#   minutes <- as.numeric(strsplit(timey.wimey, ":")[[1]][2])
-# }
-# accept <- sapply(rd$assignmentaccepttime, getTime)
-# submit <- sapply(rd$assignmentsubmittime, getTime)
-# print(mean(submit - accept))
