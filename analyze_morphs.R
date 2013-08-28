@@ -234,14 +234,26 @@ good.data$mp <- as.numeric(good.data$mp)
 good.data$rt <- as.numeric(good.data$rt)
 
 # ################ z scores
-# z <- c()
-# for (s in subjects) {
-#   subj.data <- subset(good.data, good.data$subj==s)
-#   subj.z <- scale(subj.data$mp)
-#   z <- c(z, subj.z)
-# }
-#z.data <- data.frame(subj=good.data$subj, dist=good.data$dist, mod=good.data$mod, mp=z)
-# #z.means <- aggregate(z ~ dist + mod, data = z.data, FUN = mean)
+z.mp <- c(sapply(good.subjects, function(s) {
+    subj.data <- subset(good.data, good.data$subj==s)
+    return(scale(subj.data$mp))
+}))
+z.subj <- c(sapply(good.subjects, function(s) {
+  return(rep(s, 6))
+}))
+z.dist <- c(sapply(good.subjects, function(s) {
+  subj.data <- subset(good.data, good.data$subj==s)
+  return(subj.data$dist)
+}))
+z.mod <- c(sapply(good.subjects, function(s) {
+  subj.data <- subset(good.data, good.data$subj==s)
+  return(subj.data$mod)
+}))
+z.other.dist <- c(sapply(good.subjects, function(s) {
+  subj.data <- subset(good.data, good.data$subj==s)
+  return(subj.data$other.dist)
+}))
+z.data <- data.frame(subj=z.subj, dist=z.dist, mod=z.mod, mp=z.mp, other.dist=z.other.dist)
 # 
 ################ anova
 adj.anova <- aov(mp ~ dist*mod, data=good.data)
@@ -300,3 +312,4 @@ mygraph <- function(mydata, range, mytitle) {
 }
 
 mygraph(good.data, c(0,1), "Novel Adj Scale")
+mygraph(z.data, c(-1.5,1.5), "Novel Adj Scale (zscored)")
