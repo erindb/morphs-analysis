@@ -311,25 +311,20 @@ print(z.anova)
 zothercat.lm <- lm(mp ~ dist*mod*other.dist, data=z.data)
 zothercat.anova <- anova(zothercat.lm)
 print(zothercat.anova)
+
+dists <- c("down", "mid", "unif")
+mods <- c("none", "adj", "very")
 ################ graph
 mygraph <- function(mydata, range, mytitle) {
   avg.data <- aggregate(mp ~ dist + mod, data = mydata, FUN = mean)
   
-  down.none <- avg.data$mp[avg.data$dist == "down" & avg.data$mod == "none"]
-  down.adj <- avg.data$mp[avg.data$dist == "down" & avg.data$mod == "adj"]
-  down.very <- avg.data$mp[avg.data$dist == "down" & avg.data$mod == "very"]
-  mid.none <- avg.data$mp[avg.data$dist == "mid" & avg.data$mod == "none"]
-  mid.adj <- avg.data$mp[avg.data$dist == "mid" & avg.data$mod == "adj"]
-  mid.very <- avg.data$mp[avg.data$dist == "mid" & avg.data$mod == "very"]
-  unif.none <- avg.data$mp[avg.data$dist == "unif" & avg.data$mod == "none"]
-  unif.adj <- avg.data$mp[avg.data$dist == "unif" & avg.data$mod == "adj"]
-  unif.very <- avg.data$mp[avg.data$dist == "unif" & avg.data$mod == "very"]
+  mp <- unlist(lapply(dists, function(d) {
+    lapply(mods, function(m) {
+      avg.data$mp[avg.data$dist == d & avg.data$mod == m]
+    })
+  }))
   
-  mp <- c(down.none, down.adj, down.very,
-          mid.none, mid.adj, mid.very,
-          unif.none, unif.adj, unif.very)
-  
-  graph.data <- (matrix(data=mp, nrow=3, ncol=3,
+  graph.data <- (matrix(data=unlist(mp), nrow=3, ncol=3,
                        dimnames=list(c("none", "adj", "very"),
                                      c("peakedDown", "peakedMid", "uniform"))))
   novel.adj.bar <- barplot(as.matrix(graph.data), main=mytitle,
@@ -337,8 +332,6 @@ mygraph <- function(mydata, range, mytitle) {
   legend("topleft", c("wug", "feppy wug", "very feppy wug"), cex=0.6, bty="n", fill=rainbow(3));
   
   ### confidence intervals
-  dists <- c("down", "mid", "unif")
-  mods <- c("none", "adj", "very")
   conf.ints <- lapply(dists, function(dist) {
     return(lapply(mods, function(mod) {
       sub.subjs <- mydata$subj[mydata$mod == mod & mydata$dist == dist]
@@ -365,3 +358,15 @@ mygraph <- function(mydata, range, mytitle) {
 
 mygraph(good.data, c(0,1), "Novel Adj Scale")
 mygraph(z.data, c(-1.5,1.5), "Novel Adj Scale (z-scored)")
+
+
+
+par(mfrow=c(3,3))
+lapply(dists, function(d) {
+  lapply(mods, function(m) {
+    samples <- good.data$mp[good.data$dist == d & good.data$mod == m]
+    f <- density(samples, kernel="gaussian", bw="nrd", from=0, to=1)
+    plot(f$x, f$y, type="l", main=paste(d, m))
+    abline(v = mean(samples), col="blue")
+  })
+})
