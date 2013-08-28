@@ -81,7 +81,7 @@ other.distributions <- c(sapply(1:ntargets, function(i){
   return(dists)
 }))
 
-subjects <- c(sapply(1:ntargets, function(i){
+subj.col <- c(sapply(1:ntargets, function(i){
   subj <- subjects[[i]]
   return(rep(subj, 6))
 }))
@@ -110,7 +110,7 @@ responses <- c(sapply(1:ntargets, function(i){
 modifiers <- c(rep(mod.levels, ntargets*2))
 
 #create target data frame
-target.data <- data.frame(subj=subjects, #worker id
+target.data <- data.frame(subj=subj.col, #worker id
                           dist=distributions, #where the distribution is peaked (down, mid, or unif)
                           mp=responses, #degree modifier (very, adj, none)
                           mod=modifiers, #morph proportion of chosen picture
@@ -165,7 +165,9 @@ warmup.data <- data.frame(subj=subj.col, #worker id
                                                  #in compare-type warmup question
                           right.mp=numeric(nrow), #morph proportion for right shape
                                                   #in compare-type warmup question
-                          response=response.col
+                          response=response.col,
+                          lowerdist=character(nrow),
+                          higherdist=character(nrow)
 )
 
 index <- 1
@@ -196,7 +198,7 @@ for (s in 1:nsubj) {
     } else {print("ERROR 6")}
     mp <- question[["morphProps"]]
     if (length(mp) == 1) {
-      class.mp <- mp
+      class.mp <- as.numeric(mp)
       left.mp <- NA
       right.mp <- NA
     } else if (length(mp) == 2) {
@@ -205,7 +207,10 @@ for (s in 1:nsubj) {
       right.mp <- mp[[2]]
     } else { print("ERROR 5") }
     order <- paste(as.character(question$order), collapse="")
-    warmup.data[index,] <- c(subj, q, type, rt, corr, order, class.mp, left.mp, right.mp, response)
+    lower <- distlist[[1]]
+    higher <- distlist[[2]]
+    warmup.data[index,] <- c(subj, q, type, rt, corr, order, class.mp,
+                             left.mp, right.mp, response, lower, higher)
     index <- index + 1
   }
 }
@@ -217,11 +222,45 @@ warmup.data$correctness <- as.numeric(warmup.data$correctness)
 
 exclusion.list <- c()
 
-# based on warmups
-# change this to how well they did on the obvious ones
+# based on correctness of compare warmups
 avg.correct <-aggregate(x=as.numeric(warmup.data$correctness)[warmup.data$type == "compare"],
                         by=list(warmup.data$subj[warmup.data$type == "compare"]), FUN="mean")
 exclusion.list <- c(exclusion.list, as.character(avg.correct$Group.1[avg.correct$x < 0.5]))
+
+# # how well they did on the obvious ones
+# obvious.compare <- c(0.15, 0.55, 0.45, 0.85)
+# obvious.class <- c(0.52, 0.92)
+# obv.compare.ind <- warmup.data$type=="compare" & (is.element(warmup.data$left.mp, obvious.compare))
+# obv.class.ind <- warmup.data$type=="classify" & (sapply(1:length(warmup.data$class.mp), function(i) {
+#   return(is.element(warmup.data$class.mp[[i]], obvious.class))
+# }))
+# class.correct <- sapply(1:nrow(warmup.data), function(i) {
+#   class.mp <- as.numeric(warmup.data$class.mp)[[i]]
+#   if (is.na(class.mp) || !(is.element(class.mp, obvious.class))) {
+#     return(NA)
+#   } else {
+#     response <- warmup.data$response[[i]]
+#     higher <- warmup.data$higherdist
+#     lower <- warmup.data$lowerdist
+#     if (class.mp == 0.52) {
+#       correct.class <- "down"
+#     } else if (class.mp == 0.92) {
+#       correct.class <- higher
+#     } else {
+#       print("error7")
+#     }
+#     if (response == correct.class) {
+#       return(1)
+#     } else {
+#       return(0)
+#     }
+#   }
+# })
+# warmup.data$class.correct <- class.correct
+# avg.obvious.compare.correct <- aggregate(x=as.numeric(warmup.data$correctness)[obv.compare.ind],
+#                                          by=list(warmup.data$subj[obv.compare.ind]), FUN="mean")
+# avg.obvious.class.correct <- aggregate(x=as.numeric(warmup.data$class.correct)[obv.class.ind],
+#                                        by=list(warmup.data$subj[obv.class.ind]), FUN="mean")
 
 # based on reaction time
 
