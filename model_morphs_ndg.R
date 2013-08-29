@@ -3,7 +3,8 @@ setwd("~/morphs-analysis/")  ###change this to actual location of repo
 library(stats)
 
 #for speaker1 discretization:
-grid.steps = 10
+grid.steps = 100
+grid = seq(0,1,length.out=grid.steps)
 
 #example items from experiment, 15 each distribution
 down.examples <- c(0.04583, 0.003231, 0.07391, 0.01884, 0.00003024, 0.04158,
@@ -91,45 +92,51 @@ polarity = function(utterance) {
 #erin did not change this fn
 relevant.theta = function(utterance) {return(which(possible.utterances[-1] == utterance))}
 
-is.true = function(utterance, thetas, degree, thetaGtr) {
-  if (thetaGtr) {
-    theta.cond <- thetas[relevant.theta('very pos')] > thetas[relevant.theta('pos')]
-  } else {
-    theta.cond <- T
-  }
-	if (utterance == 'no-utt') {
-		return(T)
-	} else if (polarity(utterance) == 'positive' &&
-               degree >= thetas[relevant.theta(utterance)] && theta.cond) {
-		return(T)
-	} else if (polarity(utterance) == 'negative' &&
-               degree <= thetas[relevant.theta(utterance)]) {
-		return(T)
-	} else {
-		return(F)
-	}
+cache.index = function(v) {
+  return(1+round(v*(grid.steps-1)))
 }
 
-#todo: put back erins Gtr test..
-listener0 = function(utterance, thetas, degree, cdf, thetaGtr) {
-  if (utterance == 'no-utt') {
-    return(1)
-  }	
-  theta = thetas[relevant.theta(utterance)]
-  if(polarity(utterance) == 'positive') {
-    if(degree < theta) {
-      return(0) #utterance false
+L0.cache <- array(NA,dim = c(grid.steps,grid.steps,grid.steps,length(possible.utterances)))
+S1.cache <- array(NA,dim = c(grid.steps,grid.steps,grid.steps,length(possible.utterances)))
+
+clear.cache = function(){
+  L0.cache <- array(NA,dim = c(grid.steps,grid.steps,grid.steps,length(possible.utterances)))
+  S1.cache <- array(NA,dim = c(grid.steps,grid.steps,grid.steps,length(possible.utterances)))
+}
+
+#todo: put back erin's Gtr test..
+listener0 = function(utterance, thetas, degree, pdf, cdf, thetaGtr) {
+  #round to grid. 
+  d = cache.index(degree)
+  t1 = cache.index(thetas[1])
+  t2 = cache.index(thetas[2])
+  ut = which(possible.utterances == utterance)
+  
+  if(is.na(L0.cache[d,t1,t2,ut])) {
+    theta = if(ut==2){grid[t1]} else {grid[t2]}
+    deg = grid[d]
+    if (utterance == 'no-utt') {
+      L0.cache[d,t1,t2,ut] <- pdf(deg)
+    }	else if(polarity(utterance) == 'positive') {
+      L0.cache[d,t1,t2,ut] <- (deg >= theta) * pdf(deg) / 1-cdf(theta)
     } else {
-      return(1-cdf(theta))
-    }
-  } else {
-    if(degree > theta) {
-      return(0) #utterance false
-    } else {
-      return(cdf(theta))
+      L0.cache[d,t1,t2,ut] <- (deg <= theta) * pdf(deg) / cdf(theta)
     }
   }
+  return(L0.cache[d,t1,t2,ut])
 }
+  
+# #cached likelihoods on a grid (currently hard-wired for two thetas):
+# grid = seq(0,1,length.out=grid.steps)
+# s1 = array(NA,dim = c(grid.steps,grid.steps,grid.steps))
+# S1.likelihood = function(d,t1,t2) {
+# 
+#   if(is.na(s1[d,t1,t2])) {
+#     s1[d,t1,t2] <- speaker1(c(grid[t1], grid[t2]), grid[d], utterance, alpha, utt.cost, cdf, thetaGtr)
+#   }
+#   return(s1[d,t1,t2])
+# }
+
 
 #erin did not change this fn
 mylnth = function(u) {
@@ -142,14 +149,24 @@ mylnth = function(u) {
 	}
 }
 
-speaker1 = function(thetas, degree, utterance, alpha, utt.cost, cdf, thetaGtr) {
-	eval.utt = function(utt) {
-		cost = 
-		l0 = listener0(utt, thetas, degree, cdf, thetaGtr)
+speaker1 = function(thetas, degree, utterance, alpha, utt.cost, pdf, cdf, thetaGtr) {
+  #round to grid. 
+  d = cache.index(degree)
+  t1 = cache.index(thetas[1])
+  t2 = cache.index(thetas[2])
+  ut = which(possible.utterances == utterance)
+  
+  eval.utt = function(utt) {
+		l0 = listener0(utt, thetas, degree, pdf, cdf, thetaGtr)
 		return( (l0^alpha) * exp(-alpha * utt.cost *  mylnth(utt)))
 	}
-	utt.probs = sapply(possible.utterances, FUN=eval.utt)
-	return(utt.probs[utterance.index(utterance)]/sum(utt.probs))
+  
+	if(is.na(S1.cache[d,t1,t2,ut])) {
+    utt.probs = sapply(possible.utterances, FUN=eval.utt)
+    S1.cache[d,t1,t2,] <- utt.probs/sum(utt.probs)
+	}
+  
+	return(S1.cache[d,t1,t2,ut])
 }
 
 listener1 = function(utterance, alpha, utt.cost, n.samples, step.size,
@@ -163,21 +180,7 @@ listener1 = function(utterance, alpha, utt.cost, n.samples, step.size,
   dimnames <- list(dim1, dim2)
 	samples = matrix(NA, nrow=n.samples, ncol=length(possible.utterances), dimnames=dimnames)
   
-  
-  #cached likelihoods on a grid (currently hard-wired for two thetas):
-  grid = seq(0,1,length.out=grid.steps)
-  s1 = array(NA,dim = c(grid.steps,grid.steps,grid.steps))
-  S1.likelihood = function(d,t1,t2) {
-    #faster way to do this?
-    d = which.min(abs(d-grid))
-    t1 = which.min(abs(t1-grid))
-    t2 = which.min(abs(t2-grid))
-    if(is.na(s1[d,t1,t2])) {
-      s1[d,t1,t2] <- speaker1(c(grid[t1], grid[t2]), grid[d], utterance, alpha, utt.cost, cdf, thetaGtr)
-    }
-    return(s1[d,t1,t2])
-  }
-  
+    
   #scoring function, to compute (unormalized) probability of state. (should be in log domain?)
   prob.unnormed = function(state) {
     #check bounds:
@@ -187,12 +190,12 @@ listener1 = function(utterance, alpha, utt.cost, n.samples, step.size,
     #prior for degree (thetas have unif prior):
     prior = dens(degree)
     #probbaility speaker would have said this (given state):
-    likelihood = S1.likelihood(degree, thetas[1], thetas[2])
+    likelihood = speaker1(thetas, degree, utterance, alpha, utt.cost, dens, cdf, thetaGtr)
     return(prior*likelihood)
   }
   
   #initialize chain by rejection:
-  print("initializing chain")
+  print("initializing")
   state.prob=0
   state = runif(length(possible.utterances), 0, 1) #a degree val, and a theta for all but "no-utt"
   while(state.prob==0) {
@@ -222,21 +225,27 @@ listener1 = function(utterance, alpha, utt.cost, n.samples, step.size,
 		samples[i,] = state
 	}
   
+  print("acceptance rate:")
+  print(n.proposals.accepted/(n.samples-1))
+  
 	return(list(samples=samples, prop.accepted=n.proposals.accepted/(n.samples-1)))
 }
 
 #run model with these values of parameters
 model <- function(alpha, utt.cost, thetaGtr, label) {
-  n.true.samples <- 10#30000 #number of samples to keep
-  lag <- 10#50 #number of samples to skip over
+  n.true.samples <- 1000#30000 #number of samples to keep
+  lag <- 5#50 #number of samples to skip over
   burn.in <- 10#5000
   n.samples <- n.true.samples * lag + burn.in
-  step.size <- 0.005
+  step.size <- 0.05
   dists <- c("down", "mid", "unif")
+  
+  clear.cache()
+  
   model.runs <- lapply(dists, function(dist) {
     return(lapply(possible.utterances, function(utterance) {
       listener1(utterance, alpha=alpha, utt.cost=utt.cost, n.samples=n.samples,
-                step.size=step.size, dist=dist, band.width=0.09466942, thetaGtr=thetaGtr)
+                step.size=step.size, dist=dist, band.width="SJ", thetaGtr=thetaGtr)
     }))
   })
   model.runs <- lapply(model.runs, function(run) {
@@ -260,42 +269,43 @@ model <- function(alpha, utt.cost, thetaGtr, label) {
     du.frame <- model.runs[[d]][[u]]
     #save all data
     write.table(du.frame, du.name)
-    #get mean for this combo of dist and modifier
-    return(mean(du.frame[["samples"]]))
+    return(mean(du.frame[["samples"]][,"degree"]))
   })
-  
-  avg.data <- data.frame(dist=graph.dist, utterance=graph.utterance, mean=graph.means)
-  graph.data <- matrix(avg.data$mean, nrow=3, ncol=3, dimnames=list(possible.utterances, dists))
+  write.table(graph.means, paste(c(label, "-means.data"), collapse=""))
+  graph.data <- (matrix(data=graph.means, nrow=3, ncol=3,
+                        dimnames=list(c("none", "adj", "very"),
+                                      c("peakedDown", "peakedMid", "uniform"))))
   png(paste(c(label, ".png"), collapse=""))
-  barplot(graph.data, beside=T, main="Model", ylab="feppiness",
-          col=rainbow(3), ylim=c(0,1))
-  
-  avg.data
+  novel.adj.bar <- barplot(as.matrix(graph.data), main="alpha=1, cost=2, very>pos",
+                           ylab="feppiness", beside=TRUE, col=rainbow(3), ylim=c(0,1))
+  legend("topleft", c("wug", "feppy wug", "very feppy wug"), cex=0.6, bty="n", fill=rainbow(3));
   dev.off()
 }
 
-#graph data and save plot -- CHECK THIS!
-sapply( c("down", "mid", "unif"), function(dist) {
-  h <- 0.09
-  kernel.est <- est.kernel(dist, h)
-  dens <- make.pdf(kernel.est)
-  int <- make.cdf(kernel.est)
-  x <- seq(-1, 2, 0.01)
-  int.y <- sapply(x, int)
-  dens.y <- sapply(x, dens)
-  plot(x,int.y,ylim=c(0,5), ylab="", xlab="", type="l")
-  par(new=T)
-  plot(x,dens.y, ylim=c(0,5), ylab="", xlab="", type="l")
-  print(integrate(function(x){return(sapply(x, dens))}, lower=-0.1, upper=1.1))
-})
+timestamp <- as.character(unclass(Sys.time()))
+
+mainDir <- "~/morphs-analysis/"
+subDir <- paste(c("output", timestamp), collapse="")
+
+if (!(file.exists(subDir))) {
+  dir.create(file.path(mainDir, subDir))
+}
+
+time.label <- function(identifier) {
+  return(paste(c("output", timestamp, "/", identifier), collapse=""))
+}
 
 #run the model with different values of free parameters
-model(alpha=1, utt.cost=2, thetaGtr=T, label="output/alpha1cost2thetaGtr")
-model(alpha=1, utt.cost=2, thetaGtr=F, label="output/alpha1cost2")
-model(alpha=1, utt.cost=2, thetaGtr=F, label="output/alpha1cost5")
-model(alpha=2, utt.cost=2, thetaGtr=T, label="output/alpha2cost2thetaGtr")
-model(alpha=2, utt.cost=2, thetaGtr=F, label="output/alpha2cost2")
-model(alpha=2, utt.cost=2, thetaGtr=F, label="output/alpha2cost5")
-model(alpha=4, utt.cost=2, thetaGtr=T, label="output/alpha4cost2thetaGtr")
-model(alpha=4, utt.cost=2, thetaGtr=F, label="output/alpha4cost2")
-model(alpha=4, utt.cost=2, thetaGtr=F, label="output/alpha4cost5")
+
+model(alpha=1, utt.cost=2, thetaGtr=F, label=time.label("alpha1cost2"))
+
+
+#model(alpha=1, utt.cost=2, thetaGtr=T, label="output/alpha1cost2thetaGtr")
+#model(alpha=1, utt.cost=2, thetaGtr=F, label="output/alpha1cost2")
+# model(alpha=1, utt.cost=2, thetaGtr=F, label="output/alpha1cost5")
+# model(alpha=2, utt.cost=2, thetaGtr=T, label="output/alpha2cost2thetaGtr")
+# model(alpha=2, utt.cost=2, thetaGtr=F, label="output/alpha2cost2")
+# model(alpha=2, utt.cost=2, thetaGtr=F, label="output/alpha2cost5")
+# model(alpha=4, utt.cost=2, thetaGtr=T, label="output/alpha4cost2thetaGtr")
+# model(alpha=4, utt.cost=2, thetaGtr=F, label="output/alpha4cost2")
+# model(alpha=4, utt.cost=2, thetaGtr=F, label="output/alpha4cost5")
