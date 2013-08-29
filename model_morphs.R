@@ -254,37 +254,37 @@ model <- function(alpha, utt.cost, thetaGtr, label) {
     write.table(du.frame, du.name)
     return(mean(du.frame[["samples"]][,"degree"]))
   })
+  write.table(graph.means, paste(c(label, "-means.data"), collapse=""))
   graph.data <- (matrix(data=graph.means, nrow=3, ncol=3,
                         dimnames=list(c("none", "adj", "very"),
                                       c("peakedDown", "peakedMid", "uniform"))))
+  png(paste(c(label, ".png"), collapse=""))
   novel.adj.bar <- barplot(as.matrix(graph.data), main="alpha=1, cost=2, very>pos",
                            ylab="feppiness", beside=TRUE, col=rainbow(3), ylim=c(0,1))
   legend("topleft", c("wug", "feppy wug", "very feppy wug"), cex=0.6, bty="n", fill=rainbow(3));
-#   png(paste(c(label, ".png"), collapse=""))
-#   dev.off()
+  dev.off()
 }
 
-# sapply( c("down", "mid", "unif"), function(dist) {
-#   h <- 0.09
-#   kernel.est <- est.kernel(dist, h)
-#   dens <- make.pdf(kernel.est)
-#   int <- make.cdf(kernel.est)
-#   x <- seq(-1, 2, 0.01)
-#   int.y <- sapply(x, int)
-#   dens.y <- sapply(x, dens)
-#   plot(x,int.y,ylim=c(0,5), ylab="", xlab="", type="l")
-#   par(new=T)
-#   plot(x,dens.y, ylim=c(0,5), ylab="", xlab="", type="l")
-#   print(integrate(function(x){return(sapply(x, dens))}, lower=-0.1, upper=1.1))
-# })
+timestamp <- as.character(unclass(Sys.time()))
+
+mainDir <- "~/Code/cocolab/analyzing_experiments/morphs-analysis/"
+subDir <- paste(c("output", timestamp), collapse="")
+
+if (!(file.exists(subDir))) {
+  dir.create(file.path(mainDir, subDir))
+}
+
+time.label <- function(identifier) {
+  return(paste(c("output", timestamp, "/", identifier), collapse=""))
+}
 
 #run the model with different values of free parameters
-model(alpha=1, utt.cost=2, thetaGtr=T, label="output/alpha1cost2thetaGtr")
-model(alpha=1, utt.cost=2, thetaGtr=F, label="output/alpha1cost2")
-model(alpha=1, utt.cost=2, thetaGtr=F, label="output/alpha1cost5")
-model(alpha=2, utt.cost=2, thetaGtr=T, label="output/alpha2cost2thetaGtr")
-model(alpha=2, utt.cost=2, thetaGtr=F, label="output/alpha2cost2")
-model(alpha=2, utt.cost=2, thetaGtr=F, label="output/alpha2cost5")
-model(alpha=4, utt.cost=2, thetaGtr=T, label="output/alpha4cost2thetaGtr")
-model(alpha=4, utt.cost=2, thetaGtr=F, label="output/alpha4cost2")
-model(alpha=4, utt.cost=2, thetaGtr=F, label="output/alpha4cost5")
+model(alpha=1, utt.cost=2, thetaGtr=T, label=time.label("alpha1cost2thetaGtr"))
+model(alpha=1, utt.cost=2, thetaGtr=F, label=time.label("alpha1cost2"))
+model(alpha=1, utt.cost=2, thetaGtr=F, label=time.label("alpha1cost5"))
+model(alpha=2, utt.cost=2, thetaGtr=T, label=time.label("alpha2cost2thetaGtr"))
+model(alpha=2, utt.cost=2, thetaGtr=F, label=time.label("alpha2cost2"))
+model(alpha=2, utt.cost=2, thetaGtr=F, label=time.label("alpha2cost5"))
+model(alpha=4, utt.cost=2, thetaGtr=T, label=time.label("alpha4cost2thetaGtr"))
+model(alpha=4, utt.cost=2, thetaGtr=F, label=time.label("alpha4cost2"))
+model(alpha=4, utt.cost=2, thetaGtr=F, label=time.label("alpha4cost5"))
