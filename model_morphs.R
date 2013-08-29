@@ -252,18 +252,16 @@ model <- function(alpha, utt.cost, thetaGtr, label) {
     du.frame <- model.runs[[d]][[u]]
     #save all data
     write.table(du.frame, du.name)
-    #get mean for this combo of dist and modifier
-    return(mean(du.frame[["samples"]]))
+    return(mean(du.frame[["samples"]][,"degree"]))
   })
-  
-  avg.data <- data.frame(dist=graph.dist, utterance=graph.utterance, mean=graph.means)
-  graph.data <- matrix(avg.data$mean, nrow=3, ncol=3, dimnames=list(possible.utterances, dists))
-  png(paste(c(label, ".png"), collapse=""))
-  barplot(graph.data, beside=T, main="Model", ylab="feppiness",
-          col=rainbow(3), ylim=c(0,1))
-  
-  avg.data
-  dev.off()
+  graph.data <- (matrix(data=graph.means, nrow=3, ncol=3,
+                        dimnames=list(c("none", "adj", "very"),
+                                      c("peakedDown", "peakedMid", "uniform"))))
+  novel.adj.bar <- barplot(as.matrix(graph.data), main="alpha=1, cost=2, very>pos",
+                           ylab="feppiness", beside=TRUE, col=rainbow(3), ylim=c(0,1))
+  legend("topleft", c("wug", "feppy wug", "very feppy wug"), cex=0.6, bty="n", fill=rainbow(3));
+#   png(paste(c(label, ".png"), collapse=""))
+#   dev.off()
 }
 
 # sapply( c("down", "mid", "unif"), function(dist) {
