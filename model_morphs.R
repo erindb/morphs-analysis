@@ -281,10 +281,10 @@ time.label <- function(identifier) {
 #run the model with different values of free parameters
 model(alpha=1, utt.cost=2, thetaGtr=T, label=time.label("alpha1cost2thetaGtr"))
 model(alpha=1, utt.cost=2, thetaGtr=F, label=time.label("alpha1cost2"))
-model(alpha=1, utt.cost=2, thetaGtr=F, label=time.label("alpha1cost5"))
+model(alpha=1, utt.cost=5, thetaGtr=F, label=time.label("alpha1cost5"))
 model(alpha=2, utt.cost=2, thetaGtr=T, label=time.label("alpha2cost2thetaGtr"))
 model(alpha=2, utt.cost=2, thetaGtr=F, label=time.label("alpha2cost2"))
-model(alpha=2, utt.cost=2, thetaGtr=F, label=time.label("alpha2cost5"))
+model(alpha=2, utt.cost=5, thetaGtr=F, label=time.label("alpha2cost5"))
 model(alpha=4, utt.cost=2, thetaGtr=T, label=time.label("alpha4cost2thetaGtr"))
 model(alpha=4, utt.cost=2, thetaGtr=F, label=time.label("alpha4cost2"))
-model(alpha=4, utt.cost=2, thetaGtr=F, label=time.label("alpha4cost5"))
+model(alpha=4, utt.cost=5, thetaGtr=F, label=time.label("alpha4cost5"))
