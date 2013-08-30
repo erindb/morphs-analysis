@@ -178,23 +178,15 @@ myapply <- function(f) {
 }
 
 logit <- function(v) {
-  if (convert.logit) {
     return(sapply(v, function(p) {
       return(log(p) - log(1-p))
     }))
-  } else {
-    return(v)
-  }
 }
 
 logistic <- function(v) {
-  if (convert.logit) {
     return(sapply(v, function(x) {
       return(1/(1+exp(-x)))
     }))
-  } else {
-    return(v)
-  }
 }
 
 #horribly messy graph function
@@ -214,7 +206,7 @@ kernel.dens.plot <- function(model.runs, label) {
   png(paste(c(label, "-kernel-dens-est.png"), collapse=""), 2200, 1500, pointsize=32)
   par(mfrow=c(3,4))
   lapply(dists, function(d) {
-    f <- density(logit(examples[[d]]), kernel=k.type, bw=bw)
+    f <- density(logit(examples[[d]]), kernel="gaussian", bw="sj")
 #     if (d == "unif") {
 #       xlab <- "feppiness"
 #       ylab <- "density"
@@ -233,7 +225,7 @@ kernel.dens.plot <- function(model.runs, label) {
         ylab=""
 #       }
       samples <- mydata$mp[mydata$dist == d & mydata$mod == m]
-      f <- density(logit(samples), kernel=k.type, bw=bw)
+      f <- density(logit(samples), kernel="gaussian", bw="sj")
       plot(logistic(f$x), f$y, type="l", main="", ylab=ylab, xlab=xlab, xlim=c(0,1),
            font.main=32, lwd=3)
       mu <- mean(samples)

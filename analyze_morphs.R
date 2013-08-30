@@ -437,15 +437,28 @@ kernel.dense.plot <- function(mydata, label="", logit, c, range) {
       } else {
         convert.logit <- F
       }
-      samples <- mydata$mp[mydata$dist == d & mydata$mod == m]
-      low <- c[["low"]][[m, d]]
-      high <- c[["high"]][[m, d]]
+      otherdists <- dists[dists != d]
+      samples <- mydata$mp[mydata$dist == d & mydata$mod == m &
+                             mydata$other.dist == otherdists[1]]
+#       low <- c[["low"]][[m, d]]
+#       high <- c[["high"]][[m, d]]
       f <- density(logit(samples), kernel=k.type, bw=bw)
       plot(logistic(f$x), f$y, type="l", main="", ylab=ylab, xlab=xlab, xlim=range,
-           font.main=32, lwd=3)
+           font.main=32, lwd=3, col="blue")
       mu <- mean(samples)
       abline(v = mu, col="blue", lwd=7)
-      arrows(low, max(f$y)/2, x1=high, lwd=5, code=3, angle=90)
+      #arrows(low, max(f$y)/2, x1=high, lwd=5, code=3, angle=90)
+      par(new=T)
+      samples <- mydata$mp[mydata$dist == d & mydata$mod == m &
+                             mydata$other.dist == otherdists[2]]
+#       low <- c[["low"]][[m, d]]
+#       high <- c[["high"]][[m, d]]
+      f <- density(logit(samples), kernel=k.type, bw=bw)
+      plot(logistic(f$x), f$y, type="l", main="", ylab=ylab, xlab=xlab, xlim=range,
+           font.main=32, lwd=3, col="green")
+      mu <- mean(samples)
+      abline(v = mu, col="green", lwd=7)
+      #arrows(low, max(f$y)/2, x1=high, lwd=5, code=3, angle=90)
     })
   })
   dev.off()
