@@ -29,15 +29,15 @@ utterance.polarities = c(0,+1,+1)
 
 #using r function density to find kernal density, so it's not actually continuous
 kernel.granularity <- grid.steps #2^12 #how many points are calculated for the kernel density estimate
-est.kernel <- function(dist, bw) {
+est.kernel <- function(dist, bw, adjust) {
   return(density(examples[[dist]], from=0, to=1, n=kernel.granularity,
-                 kernel="gaussian", bw=bw, adjust=1))
+                 kernel="gaussian", bw=bw, adjust=adjust))
 }
 
 #norms the kernel density
 #takes in all the points where kernel density is estimated
-make.pdf.cache <- function(kernel.est) {
-  k = kernel.est$y + 0.00000001
+make.pdf.cache <- function(kernel.est, tolerance) {
+  k = kernel.est$y + tolerance#0.00000001
   area <- sum(k) 
   normed.dens <- k/area
   return(normed.dens)
@@ -45,8 +45,8 @@ make.pdf.cache <- function(kernel.est) {
 
 #creates fn that approximates percentage of area before x
 #takes in all the points where kernel density is estimated
-make.cdf.cache <- function(kernel.est) {
-  cumulants <- cumsum(make.pdf.cache(kernel.est))
+make.cdf.cache <- function(kernel.est, tolerance) {
+  cumulants <- cumsum(make.pdf.cache(kernel.est, tolerance))
   return(cumulants)
 }
 
@@ -57,7 +57,7 @@ S1.cache <- array(NA,dim = c(grid.steps,grid.steps,grid.steps,length(possible.ut
 cache.misses=0 #to track whether caching is working right.
 
 clear.cache = function(){
-  print(paste("L0 cache NAs:", length(is.na(L0.cache))))
+  #print(paste("L0 cache NAs:", length(is.na(L0.cache))))
   cache.misses<<-0
   L0.cache <<- array(NA,dim = c(grid.steps,grid.steps,grid.steps,length(possible.utterances)))
   S1.cache <<- array(NA,dim = c(grid.steps,grid.steps,grid.steps,length(possible.utterances)))
@@ -87,14 +87,18 @@ listener0 = function(utterance.idx, thetas.idx, degree.idx, pdf, cdf, thetaGtr) 
   return(L0.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx])
 }
 
-speaker1 = function(thetas.idx, degree.idx, utterance.idx, alpha, utt.cost, pdf, cdf, thetaGtr) {
+speaker1 = function(thetas.idx, degree.idx, utterance.idx, alpha, utt.cost, pdf, cdf, thetaGtr, very.cost) {
  
   if(is.na(S1.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx])) {
     cache.misses <<- cache.misses + 1
     utt.probs = array(0,dim=c(length(possible.utterances)))
     for(i in 1:length(possible.utterances)) {
       l0 = listener0(i, thetas.idx, degree.idx, pdf, cdf, thetaGtr)
-      utt.probs[i] <- (l0^alpha) * exp(-alpha * utt.cost *  utterance.lengths[i])
+      if (possible.utterances[[i]] == "very pos") {
+        utt.probs[i] <- (l0^alpha) * exp(-alpha * very.cost)
+      } else {
+        utt.probs[i] <- (l0^alpha) * exp(-alpha * utt.cost)
+      }
     }
     S1.cache[degree.idx,thetas.idx[1],thetas.idx[2],] <<- utt.probs/sum(utt.probs)
 	}
@@ -103,13 +107,13 @@ speaker1 = function(thetas.idx, degree.idx, utterance.idx, alpha, utt.cost, pdf,
 }
 
 listener1 = function(utterance, alpha, utt.cost, n.samples, step.size,
-                     dist, band.width, thetaGtr) {
+                     dist, band.width, thetaGtr, tolerance, adjust, very.cost) {
   
   utt.idx = which(possible.utterances == utterance)
   
-  kernel.est <- est.kernel(dist, band.width)
-  pdf <- make.pdf.cache(kernel.est)
-  cdf <- make.cdf.cache(kernel.est)
+  kernel.est <- est.kernel(dist, band.width, adjust)
+  pdf <- make.pdf.cache(kernel.est, tolerance)
+  cdf <- make.cdf.cache(kernel.est, tolerance)
     
   dim1 <- paste('samp', 1:n.samples, sep='')
   dim2 <- c('degree', paste('theta.', possible.utterances[-1], sep=''))
@@ -126,7 +130,7 @@ listener1 = function(utterance, alpha, utt.cost, n.samples, step.size,
     #prior for degree (thetas have unif prior):
     prior = pdf[degree.idx]
     #probbaility speaker would have said this (given state):
-    likelihood = speaker1(thetas.idx, degree.idx, utt.idx, alpha, utt.cost, pdf, cdf, thetaGtr)
+    likelihood = speaker1(thetas.idx, degree.idx, utt.idx, alpha, utt.cost, pdf, cdf, thetaGtr, very.cost)
     return(prior*likelihood)
   }
   
@@ -169,6 +173,7 @@ listener1 = function(utterance, alpha, utt.cost, n.samples, step.size,
 	return(list(samples=samples, prop.accepted=n.proposals.accepted/(n.samples-1)))
 }
 
+dists <- c("down", "mid", "unif")
 myapply <- function(f) {
   c(sapply(dists, function(dist) {
     return(c(sapply(possible.utterances, function(utterance) {
@@ -178,23 +183,15 @@ myapply <- function(f) {
 }
 
 logit <- function(v) {
-  if (convert.logit) {
-    return(sapply(v, function(p) {
+  return(sapply(v, function(p) {
       return(log(p) - log(1-p))
     }))
-  } else {
-    return(v)
-  }
 }
 
 logistic <- function(v) {
-  if (convert.logit) {
-    return(sapply(v, function(x) {
+  return(sapply(v, function(x) {
       return(1/(1+exp(-x)))
     }))
-  } else {
-    return(v)
-  }
 }
 
 #horribly messy graph function
@@ -214,7 +211,7 @@ kernel.dens.plot <- function(model.runs, label) {
   png(paste(c(label, "-kernel-dens-est.png"), collapse=""), 2200, 1500, pointsize=32)
   par(mfrow=c(3,4))
   lapply(dists, function(d) {
-    f <- density(logit(examples[[d]]), kernel=k.type, bw=bw)
+    f <- density(logit(examples[[d]]), kernel="gaussian", bw="SJ")
 #     if (d == "unif") {
 #       xlab <- "feppiness"
 #       ylab <- "density"
@@ -233,7 +230,7 @@ kernel.dens.plot <- function(model.runs, label) {
         ylab=""
 #       }
       samples <- mydata$mp[mydata$dist == d & mydata$mod == m]
-      f <- density(logit(samples), kernel=k.type, bw=bw)
+      f <- density(logit(samples), kernel="gaussian", bw="SJ")
       plot(logistic(f$x), f$y, type="l", main="", ylab=ylab, xlab=xlab, xlim=c(0,1),
            font.main=32, lwd=3)
       mu <- mean(samples)
@@ -244,19 +241,19 @@ kernel.dens.plot <- function(model.runs, label) {
 }
 
 #run model with these values of parameters
-model <- function(alpha, utt.cost, thetaGtr, label) {
-  n.true.samples <- 3000#30000 #number of samples to keep
+model <- function(alpha, utt.cost, thetaGtr, label, tolerance, adjust, very.cost) {
+  n.true.samples <- 5000#30000 #number of samples to keep
   lag <- 5 #number of samples to skip over
   burn.in <- 10
   n.samples <- n.true.samples * lag + burn.in
   step.size <- 0.03 #note this may not be appropriate for all conditions.
-  dists <- c("down", "mid", "unif")
   
   model.runs <- lapply(dists, function(dist) {
     clear.cache()
     return(lapply(possible.utterances, function(utterance) {
       listener1(utterance, alpha=alpha, utt.cost=utt.cost, n.samples=n.samples,
-                step.size=step.size, dist=dist, band.width="SJ", thetaGtr=thetaGtr)
+                step.size=step.size, dist=dist, band.width="SJ", thetaGtr=thetaGtr,
+                tolerance, adjust, very.cost)
     }))
   })
   model.runs <- lapply(model.runs, function(run) {
@@ -296,17 +293,55 @@ if (!(file.exists(subDir))) {
   dir.create(file.path(mainDir, subDir))
 }
 
-time.label <- function(alpha, cost, i) {
-  return(paste(c("output", timestamp, "/alpha", alpha, "cost", cost,
-                 "run", i), collapse=""))
+time.label <- function(alpha, cost, tol, adj, i, very.cost) {
+  return(paste(c("output", timestamp, "/alpha", alpha, "_cost", cost,
+                 "_tol", tol, "_adjust", adj, "_very", very.cost,
+                 "_run", i), collapse=""))
 }
 
+
+expt.means <- c(0.3774988, 0.2063296, 0.4692256, 0.6403353, 0.5309518,
+                0.8261740, 0.6875057, 0.5141071, 0.9364525) #from analyze_morphs.R
 #run the model with different values of free parameters
-sapply(1:10, function(i) {
-  sapply(c(1,5,10), function(alpha) {
-    sapply(c(1,2,5), function(cost) {
+sapply(c(1,5,10), function(alpha) {
+  sapply(c(1,2), function(adj) {
+    sapply(c(4,5,6), function(very.cost) {
+      tol <- 0.001
+      cost <- 1
+      i <- 1
+      file.label <- time.label(alpha, cost, tol, adj, i, very.cost)
       model(alpha=alpha, utt.cost=cost, thetaGtr=F,
-            label=time.label(alpha, cost, i))
+            label=file.label, tol, adj, very.cost)
+      model.means <- read.table(paste(c(file.label, "-means.data"), collapse=""))
+      print(paste("Correlation: ", cor(model.means, expt.means)))
+      print(paste("Cost of Very: ", very.cost))
+      print(paste("bandwidth adjustment: ", adj))
     })
   })
 })
+
+# alphas <- c(1,5,10)
+# costs <- c(1,2,5)
+# sapply(alphas, function(alpha) {
+#   return(sapply(costs, function(cost) {
+#     i <- 1
+#     #print(paste(c(time.label(alpha, cost, i), "-means.data"), collapse=""))
+#     model.means <- read.table(paste(c(time.label(alpha, cost, i), "-means.data"), collapse=""))
+#     return(cor(model.means, expt.means))
+#   }))
+# })
+
+# cor <- sapply( c("output1377888015.16297/alpha1cost1run1-means.data",
+#           "output1377888015.16297/alpha1cost2run1-means.data",
+#           "output1377888015.16297/alpha1cost5run1-means.data",
+#           "output1377888015.16297/alpha5cost1run1-means.data",
+#           "output1377888015.16297/alpha5cost2run1-means.data",
+#           "output1377888015.16297/alpha5cost5run1-means.data",
+#           "output1377888015.16297/alpha10cost1run1-means.data",
+#           "output1377888015.16297/alpha10cost2run1-means.data",
+#           "output1377888015.16297/alpha10cost5run1-means.data"), function(file.name) {
+#   model.means <- read.table(file.name)
+#   expt.means <- avg.data$mp
+#   return(cor(model.means, expt.means))
+# })
+# names(cor) <- c("a1c1", "a1c2", "a1c5", "a5c1", "a5c2", "a5c5", "a10c1", "a10c2", "a10c5")
