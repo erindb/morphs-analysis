@@ -3,7 +3,7 @@ setwd("~/morphs-analysis/")  ###change this to actual location of repo
 library(stats)
 
 #for speaker1 discretization:
-grid.steps = 32
+grid.steps = 64
 grid = seq(0,1,length.out=grid.steps)
 cache.index = function(v) {
   return(1+round(v*(grid.steps-1)))
@@ -36,17 +36,16 @@ est.kernel <- function(dist, bw) {
 #norms the kernel density
 #takes in all the points where kernel density is estimated
 make.pdf.cache <- function(kernel.est) {
-  area <- sum(kernel.est$y) 
-  normed.dens <- kernel.est$y/area
+  k = kernel.est$y + 0.00000001
+  area <- sum(k) 
+  normed.dens <- k/area
   return(normed.dens)
 }
 
 #creates fn that approximates percentage of area before x
 #takes in all the points where kernel density is estimated
 make.cdf.cache <- function(kernel.est) {
-  area <- sum(kernel.est$y) #total area covered by kernel
-  #density estimate
-  cumulants <- cumsum(kernel.est$y/area)
+  cumulants <- cumsum(make.pdf.cache(kernel.est))
   return(cumulants)
 }
 
@@ -63,24 +62,24 @@ clear.cache = function(){
 }
 
 
-
-
-#todo: put back erin's Gtr test..
 listener0 = function(utterance.idx, thetas.idx, degree.idx, pdf, cdf, thetaGtr) {
   
   if(is.na(L0.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx])) {
     cache.misses <<- cache.misses + 1
+    theta.order = !(thetaGtr & (grid[thetas.idx[1]]>=grid[thetas.idx[2]]))
     if (utterance.idx == 1) { #assume the null utterance
-      L0.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx] <<- pdf[degree.idx]
+      L0.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx] <<- theta.order* pdf[degree.idx]
     }	else if(utterance.polarities[utterance.idx] == +1) {
       theta.idx = thetas.idx[utterance.idx-1]
       utt.true = grid[degree.idx] >= grid[theta.idx]  
-      L0.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx] <<- utt.true * pdf[degree.idx] / 1-cdf[theta.idx]
+      true.norm = if(theta.idx==1){1} else {1-cdf[theta.idx-1]}
+      L0.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx] <<- theta.order* utt.true * pdf[degree.idx] / true.norm
     } else {
       theta.idx = thetas.idx[utterance.idx-1]
       theta.idx = thetas.idx[utterance.idx-1]
       utt.true = grid[degree.idx] <= grid[theta.idx] 
-      L0.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx] <<- utt.true * pdf[degree.idx] / cdf[theta.idx]
+      true.norm = cdf[theta.idx]
+      L0.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx] <<- theta.order* utt.true * pdf[degree.idx] / true.norm
     }
   }
   return(L0.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx])
@@ -120,10 +119,8 @@ listener1 = function(utterance, alpha, utt.cost, n.samples, step.size,
   prob.unnormed = function(state) {
     #check bounds:
     if (any(state < 0) || any(state > 1)) {return(0)}
-    degree = state[1]
-    thetas = state[2:length(state)]
-    degree.idx = cache.index(degree)
-    thetas.idx = c(cache.index(thetas[1]), cache.index(thetas[2]))#sapply(thetas,cache.index)
+    degree.idx = cache.index(state[1])
+    thetas.idx = c(cache.index(state[2]), cache.index(state[3]))#sapply(thetas,cache.index)
     #prior for degree (thetas have unif prior):
     prior = pdf[degree.idx]
     #probbaility speaker would have said this (given state):
@@ -172,11 +169,11 @@ listener1 = function(utterance, alpha, utt.cost, n.samples, step.size,
 
 #run model with these values of parameters
 model <- function(alpha, utt.cost, thetaGtr, label) {
-  n.true.samples <- 1000#30000 #number of samples to keep
-  lag <- 5#50 #number of samples to skip over
-  burn.in <- 10#5000
+  n.true.samples <- 30000 #number of samples to keep
+  lag <- 5 #number of samples to skip over
+  burn.in <- 10
   n.samples <- n.true.samples * lag + burn.in
-  step.size <- 0.05
+  step.size <- 0.03 #note this may not be appropriate for all conditions.
   dists <- c("down", "mid", "unif")
   
   model.runs <- lapply(dists, function(dist) {
@@ -235,7 +232,11 @@ time.label <- function(identifier) {
 
 #run the model with different values of free parameters
 
-model(alpha=1, utt.cost=2, thetaGtr=F, label=time.label("alpha1cost2"))
+model(alpha=1, utt.cost=2, thetaGtr=F, label=time.label("run1"))
+model(alpha=1, utt.cost=2, thetaGtr=F, label=time.label("run2"))
+model(alpha=1, utt.cost=2, thetaGtr=F, label=time.label("run3"))
+model(alpha=1, utt.cost=2, thetaGtr=F, label=time.label("run4"))
+
 
 
 #model(alpha=1, utt.cost=2, thetaGtr=T, label="output/alpha1cost2thetaGtr")
