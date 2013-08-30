@@ -169,6 +169,82 @@ listener1 = function(utterance, alpha, utt.cost, n.samples, step.size,
 	return(list(samples=samples, prop.accepted=n.proposals.accepted/(n.samples-1)))
 }
 
+myapply <- function(f) {
+  c(sapply(dists, function(dist) {
+    return(c(sapply(possible.utterances, function(utterance) {
+      return(f(dist, utterance))
+    })))
+  }))
+}
+
+logit <- function(v) {
+  if (convert.logit) {
+    return(sapply(v, function(p) {
+      return(log(p) - log(1-p))
+    }))
+  } else {
+    return(v)
+  }
+}
+
+logistic <- function(v) {
+  if (convert.logit) {
+    return(sapply(v, function(x) {
+      return(1/(1+exp(-x)))
+    }))
+  } else {
+    return(v)
+  }
+}
+
+#horribly messy graph function
+kernel.dense.plot <- function(model.runs, c, label, range) {
+  n.samples <- length(model.runs[["down"]][["none"]][["samples"]][,"degree"])
+  distributions <- myapply(function(d,u) {
+    return(rep(d, n.samples))
+  })
+  modifiers <- myapply(function(d,u) {
+    return(rep(u, n.samples))
+  })
+  samples <- myapply(function(d,u) {
+    return(model.runs[[d]][[u]][["samples"]][[,"degree"]])
+  })
+  mydata <- data.frame(dist=distributions, mod=modifiers, mp=samples)
+  png(paste(c(label, "-kernel-dens-est.png"), collapse=""), 2200, 1500, pointsize=32)
+  par(mfrow=c(3,4))
+  lapply(dists, function(d) {
+    f <- density(logit(examples[[d]]), kernel=k.type, bw=bw)
+    if (d == "unif") {
+      xlab <- "feppiness"
+      ylab <- "density"
+    } else {
+      xlab=""
+      ylab=""
+    }
+    plot(logistic(f$x), f$y, type="l", main="", xlab=xlab, ylab=ylab, xlim=c(0,1),
+         font.main=32, lwd=3)
+    lapply(mods, function(m) {
+      if (d == "unif" && m == "none") {
+        xlab <- "feppiness"
+        ylab <- "density"
+      } else {
+        xlab=""
+        ylab=""
+      }
+      samples <- mydata$mp[mydata$dist == d & mydata$mod == m]
+      low <- c[["low"]][[m, d]]
+      high <- c[["high"]][[m, d]]
+      f <- density(logit(samples), kernel=k.type, bw=bw)
+      plot(logistic(f$x), f$y, type="l", main="", ylab=ylab, xlab=xlab, xlim=range,
+           font.main=32, lwd=3)
+      mu <- mean(samples)
+      abline(v = mu, col="blue", lwd=7)
+      arrows(low, max(f$y)/2, x1=high, lwd=5, code=3, angle=90)
+    })
+  })
+  dev.off()
+}
+
 #run model with these values of parameters
 model <- function(alpha, utt.cost, thetaGtr, label) {
   n.true.samples <- 30000 #number of samples to keep
@@ -190,14 +266,6 @@ model <- function(alpha, utt.cost, thetaGtr, label) {
     return(run)
   })
   names(model.runs) <- dists
-  
-  myapply <- function(f) {
-    c(sapply(dists, function(dist) {
-      return(c(sapply(possible.utterances, function(utterance) {
-        return(f(dist, utterance))
-      })))
-    }))
-  }
   
   graph.dist <- myapply(function(d,u){return(d)})
   graph.utterance <- myapply(function(d,u){return(u)})
