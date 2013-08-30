@@ -62,24 +62,23 @@ clear.cache = function(){
 }
 
 
-listener0 = function(utterance.idx, thetas.idx, degree.idx, pdf, cdf, thetaGtr) {
+listener0 = function(utterance.idx, thetas.idx, degree.idx, pdf, cdf) {
   
   if(is.na(L0.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx])) {
     cache.misses <<- cache.misses + 1
-    theta.order = !(thetaGtr & (grid[thetas.idx[1]]>=grid[thetas.idx[2]]))
     if (utterance.idx == 1) { #assume the null utterance
-      L0.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx] <<- theta.order* pdf[degree.idx]
+      L0.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx] <<- pdf[degree.idx]
     }	else if(utterance.polarities[utterance.idx] == +1) {
       theta.idx = thetas.idx[utterance.idx-1]
       utt.true = grid[degree.idx] >= grid[theta.idx]  
       true.norm = if(theta.idx==1){1} else {1-cdf[theta.idx-1]}
-      L0.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx] <<- theta.order* utt.true * pdf[degree.idx] / true.norm
+      L0.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx] <<- utt.true * pdf[degree.idx] / true.norm
     } else {
       theta.idx = thetas.idx[utterance.idx-1]
       theta.idx = thetas.idx[utterance.idx-1]
       utt.true = grid[degree.idx] <= grid[theta.idx] 
       true.norm = cdf[theta.idx]
-      L0.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx] <<- theta.order* utt.true * pdf[degree.idx] / true.norm
+      L0.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx] <<- utt.true * pdf[degree.idx] / true.norm
     }
   }
   return(L0.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx])
@@ -91,7 +90,7 @@ speaker1 = function(thetas.idx, degree.idx, utterance.idx, alpha, utt.cost, pdf,
     cache.misses <<- cache.misses + 1
     utt.probs = array(0,dim=c(length(possible.utterances)))
     for(i in 1:length(possible.utterances)) {
-      l0 = listener0(i, thetas.idx, degree.idx, pdf, cdf, thetaGtr)
+      l0 = listener0(i, thetas.idx, degree.idx, pdf, cdf)
       utt.probs[i] <- (l0^alpha) * exp(-alpha * utt.cost *  utterance.lengths[i])
     }
     S1.cache[degree.idx,thetas.idx[1],thetas.idx[2],] <<- utt.probs/sum(utt.probs)
@@ -232,11 +231,7 @@ time.label <- function(identifier) {
 
 #run the model with different values of free parameters
 
-model(alpha=1, utt.cost=2, thetaGtr=F, label=time.label("run1"))
-model(alpha=1, utt.cost=2, thetaGtr=F, label=time.label("run2"))
-model(alpha=1, utt.cost=2, thetaGtr=F, label=time.label("run3"))
-model(alpha=1, utt.cost=2, thetaGtr=F, label=time.label("run4"))
-
+model(alpha=1, utt.cost=2, thetaGtr=T, label=time.label("alpha1cost2Gtr"))
 
 
 #model(alpha=1, utt.cost=2, thetaGtr=T, label="output/alpha1cost2thetaGtr")
