@@ -237,10 +237,8 @@ time.label <- function(alpha, cost, thetaGtr, i) {
 sapply(1:10, function(i) {
   sapply(c(1,5,10), function(alpha) {
     sapply(c(1,2,5), function(cost) {
-      sapply(c(T,F), function(thetaGtr) {
-        model(alpha=alpha, utt.cost=cost, thetaGtr=thetaGtr,
-              label=time.label(alpha, cost, thetaGtr, i))
-      })
+      model(alpha=alpha, utt.cost=cost, thetaGtr=F,
+            label=time.label(alpha, cost, thetaGtr, i))
     })
   })
 })
