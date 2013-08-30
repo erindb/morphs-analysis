@@ -1,5 +1,5 @@
 ###change this to actual location of repo
-wd <- "~/Code/cocolab/analyzing_experiments/morphs-analysis/"
+wd <- "~/morphs-analysis/"
 setwd(wd)
 
 library(stats)
@@ -42,7 +42,7 @@ make.pdf <- function(kernel.est) {
     if (x < 0 || x > 1) {
       return(0)
     } else {
-      return(normed.dens[cache.index(x)]/area)
+      return(normed.dens[cache.index(x)])
     }
   })
 }
@@ -210,7 +210,7 @@ myapply <- function(f) {
 
 #run model with these values of parameters
 model <- function(alpha, utt.cost, thetaGtr, label) {
-  n.true.samples <- 10#30000 #number of samples to keep
+  n.true.samples <- 1000#30000 #number of samples to keep
   lag <- 5#50 #number of samples to skip over
   burn.in <- 10#5000
   n.samples <- n.true.samples * lag + burn.in
@@ -243,7 +243,7 @@ model <- function(alpha, utt.cost, thetaGtr, label) {
                         dimnames=list(c("none", "adj", "very"),
                                       c("peakedDown", "peakedMid", "uniform"))))
   png(paste(c(label, ".png"), collapse=""))
-  graph.title <- paste(c("model alpha=", alpha, ", cost=", cost), collapse="")
+  graph.title <- paste(c("model alpha=", alpha, ", cost=", utt.cost), collapse="")
   novel.adj.bar <- barplot(as.matrix(graph.data), main=graph.title,
                            ylab="feppiness", beside=TRUE, col=rainbow(3), ylim=c(0,1))
   legend("topleft", c("wug", "feppy wug", "very feppy wug"), cex=0.6, bty="n", fill=rainbow(3));
