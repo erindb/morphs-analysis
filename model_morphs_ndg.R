@@ -227,25 +227,19 @@ if (!(file.exists(subDir))) {
   dir.create(file.path(mainDir, subDir))
 }
 
-time.label <- function(identifier) {
-  return(paste(c("output", timestamp, "/", identifier), collapse=""))
+time.label <- function(alpha, cost, thetaGtr, i) {
+  return(paste(c("output", timestamp, "/alpha", alpha, "cost", cost,
+                 "thetaGtr", thetaGtr, "-run", i), collapse=""))
 }
 
 #run the model with different values of free parameters
-
-model(alpha=1, utt.cost=2, thetaGtr=F, label=time.label("run1"))
-model(alpha=1, utt.cost=2, thetaGtr=F, label=time.label("run2"))
-model(alpha=1, utt.cost=2, thetaGtr=F, label=time.label("run3"))
-model(alpha=1, utt.cost=2, thetaGtr=F, label=time.label("run4"))
-
-
-
-#model(alpha=1, utt.cost=2, thetaGtr=T, label="output/alpha1cost2thetaGtr")
-#model(alpha=1, utt.cost=2, thetaGtr=F, label="output/alpha1cost2")
-# model(alpha=1, utt.cost=2, thetaGtr=F, label="output/alpha1cost5")
-# model(alpha=2, utt.cost=2, thetaGtr=T, label="output/alpha2cost2thetaGtr")
-# model(alpha=2, utt.cost=2, thetaGtr=F, label="output/alpha2cost2")
-# model(alpha=2, utt.cost=2, thetaGtr=F, label="output/alpha2cost5")
-# model(alpha=4, utt.cost=2, thetaGtr=T, label="output/alpha4cost2thetaGtr")
-# model(alpha=4, utt.cost=2, thetaGtr=F, label="output/alpha4cost2")
-# model(alpha=4, utt.cost=2, thetaGtr=F, label="output/alpha4cost5")
+sapply(1:10, function(i) {
+  sapply(c(1,5,10), function(alpha) {
+    sapply(c(1,2,5), function(cost) {
+      sapply(c(T,F), function(thetaGtr) {
+        model(alpha=alpha, utt.cost=cost, thetaGtr=thetaGtr,
+              label=time.label(alpha, cost, thetaGtr, i)
+      }
+    }
+  }
+}
