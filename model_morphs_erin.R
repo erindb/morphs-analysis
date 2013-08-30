@@ -21,8 +21,9 @@ mid.examples <- c(0.31404, 0.30456, 0.39520, 0.56064, 0.49728, 0.53187, 0.55993,
 unif.examples <- c(0.9730805, 0.0589135, 0.1332413, 0.5568001, 0.6201130, 0.4243146,
                    0.4176713, 0.2215742, 0.6778150, 0.6834636, 0.8716204, 0.5641932,
                    0.3503760, 0.9606276, 0.0048311)
+dists <- c("down", "mid", "unif")
 examples <- list(down.examples, mid.examples, unif.examples)
-names(examples) <- c("down", "mid", "unif")
+names(examples) <- dists
 possible.utterances = c('no-utt', 'pos', 'very pos') #probably OK since Ss see all of
                                                      #these in same page
 
@@ -42,7 +43,7 @@ make.pdf <- function(kernel.est) {
     if (x < 0 || x > 1) {
       return(0)
     } else {
-      return(normed.dens[cache.index(x)]/area)
+      return(normed.dens[cache.index(x)])
     }
   })
 }
@@ -78,10 +79,12 @@ polarity = function(utterance) {
 	}
 }
 
+###this is waaaaay bigger than it needs to be!
 L0.cache <- array(NA,dim = c(grid.steps,grid.steps,grid.steps,length(possible.utterances)))
 S1.cache <- array(NA,dim = c(grid.steps,grid.steps,grid.steps,length(possible.utterances)))
 
 clear.cache = function(){
+  print(length(is.na(L0.cache)))
   L0.cache <- array(NA,dim = c(grid.steps,grid.steps,grid.steps,length(possible.utterances)))
   S1.cache <- array(NA,dim = c(grid.steps,grid.steps,grid.steps,length(possible.utterances)))
 }
@@ -198,8 +201,6 @@ listener1 = function(utterance, alpha, utt.cost, n.samples, step.size,
 	return(list(samples=samples, prop.accepted=n.proposals.accepted/(n.samples-1)))
 }
 
-dists <- c("down", "mid", "unif")
-
 myapply <- function(f) {
   c(sapply(dists, function(dist) {
     return(c(sapply(possible.utterances, function(utterance) {
@@ -243,7 +244,7 @@ model <- function(alpha, utt.cost, thetaGtr, label) {
                         dimnames=list(c("none", "adj", "very"),
                                       c("peakedDown", "peakedMid", "uniform"))))
   png(paste(c(label, ".png"), collapse=""))
-  graph.title <- paste(c("model alpha=", alpha, ", cost=", cost), collapse="")
+  graph.title <- paste(c("model alpha=", alpha, ", cost=", utt.cost), collapse="")
   novel.adj.bar <- barplot(as.matrix(graph.data), main=graph.title,
                            ylab="feppiness", beside=TRUE, col=rainbow(3), ylim=c(0,1))
   legend("topleft", c("wug", "feppy wug", "very feppy wug"), cex=0.6, bty="n", fill=rainbow(3));
@@ -269,15 +270,14 @@ sapply(1:nruns, function(i) {
   model(alpha=1, utt.cost=1, thetaGtr=F, label=time.label("alpha1cost2", i))
 })
 
-# #graph pdf and cdf
-# sapply(dists, function(d) {
-#   kernel.est <- est.kernel(d, bw="SJ")
-#   dens <- make.pdf(kernel.est)
-#   int <- make.cdf(kernel.est)
-#   x.vals <- seq(-1, 2, 0.01)
-#   pdf.y <- sapply(x.vals, dens)
-#   cdf.y <- sapply(x.vals, int)
-#   plot(x.vals, pdf.y, type="l", main=d, ylab="", xlab="", ylim=c(0,1))
-#   par(new=T)
-#   plot(x.vals, cdf.y, type="l", main=d, ylab="", xlab="", ylim=c(0,1))
-# })
+#graph pdf and cdf
+sapply(dists, function(d) {
+  kernel.est <- est.kernel(d, bw="SJ")
+  dens <- make.pdf(kernel.est)
+  int <- make.cdf(kernel.est)
+  x.vals <- seq(-1, 2, 0.01)
+  pdf.y <- sapply(x.vals, dens)
+  cdf.y <- sapply(x.vals, int)
+  plot(x.vals, pdf.y, type="l", main=d, ylab="", xlab="")
+#  plot(x.vals, cdf.y, type="l", main=d, ylab="", xlab="", ylim=c(0,1))
+})
