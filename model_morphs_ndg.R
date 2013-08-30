@@ -50,30 +50,37 @@ make.cdf.cache <- function(kernel.est) {
   return(cumulants)
 }
 
+
+##caching. (R has strange purity on global assignments, so must use <<- to set cache)
 L0.cache <- array(NA,dim = c(grid.steps,grid.steps,grid.steps,length(possible.utterances)))
 S1.cache <- array(NA,dim = c(grid.steps,grid.steps,grid.steps,length(possible.utterances)))
+cache.misses=0 #to track whether caching is working right.
 
 clear.cache = function(){
-  L0.cache <- array(NA,dim = c(grid.steps,grid.steps,grid.steps,length(possible.utterances)))
-  S1.cache <- array(NA,dim = c(grid.steps,grid.steps,grid.steps,length(possible.utterances)))
+  cache.misses<<-0
+  L0.cache <<- array(NA,dim = c(grid.steps,grid.steps,grid.steps,length(possible.utterances)))
+  S1.cache <<- array(NA,dim = c(grid.steps,grid.steps,grid.steps,length(possible.utterances)))
 }
+
+
+
 
 #todo: put back erin's Gtr test..
 listener0 = function(utterance.idx, thetas.idx, degree.idx, pdf, cdf, thetaGtr) {
   
   if(is.na(L0.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx])) {
-    theta = if(utterance.idx==2){grid[t1]} else {grid[t2]}
-    deg = grid[d]
+    cache.misses <<- cache.misses + 1
     if (utterance.idx == 1) { #assume the null utterance
-    L0.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx] <- pdf[degree.idx]
+      L0.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx] <<- pdf[degree.idx]
     }	else if(utterance.polarities[utterance.idx] == +1) {
       theta.idx = thetas.idx[utterance.idx-1]
-      theta = grid[theta.idx]
-      L0.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx] <- (deg >= theta) * pdf[degree.idx] / 1-cdf[theta.idx]
+      utt.true = grid[degree.idx] >= grid[theta.idx]  
+      L0.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx] <<- utt.true * pdf[degree.idx] / 1-cdf[theta.idx]
     } else {
       theta.idx = thetas.idx[utterance.idx-1]
-      theta = grid[theta.idx]
-      L0.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx] <- (deg <= theta) * pdf[degree.idx] / cdf[theta.idx]
+      theta.idx = thetas.idx[utterance.idx-1]
+      utt.true = grid[degree.idx] <= grid[theta.idx] 
+      L0.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx] <<- utt.true * pdf[degree.idx] / cdf[theta.idx]
     }
   }
   return(L0.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx])
@@ -82,12 +89,13 @@ listener0 = function(utterance.idx, thetas.idx, degree.idx, pdf, cdf, thetaGtr) 
 speaker1 = function(thetas.idx, degree.idx, utterance.idx, alpha, utt.cost, pdf, cdf, thetaGtr) {
  
   if(is.na(S1.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx])) {
+    cache.misses <<- cache.misses + 1
     utt.probs = array(0,dim=c(length(possible.utterances)))
     for(i in 1:length(possible.utterances)) {
       l0 = listener0(i, thetas.idx, degree.idx, pdf, cdf, thetaGtr)
       utt.probs[i] <- (l0^alpha) * exp(-alpha * utt.cost *  utterance.lengths[i])
     }
-    S1.cache[degree.idx,thetas.idx[1],thetas.idx[2],] <- utt.probs/sum(utt.probs)
+    S1.cache[degree.idx,thetas.idx[1],thetas.idx[2],] <<- utt.probs/sum(utt.probs)
 	}
   
 	return(S1.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx])
@@ -156,6 +164,8 @@ listener1 = function(utterance, alpha, utt.cost, n.samples, step.size,
   
   print("acceptance rate:")
   print(n.proposals.accepted/(n.samples-1))
+  print("misses since last cache clear:")
+  print(cache.misses)
   
 	return(list(samples=samples, prop.accepted=n.proposals.accepted/(n.samples-1)))
 }
