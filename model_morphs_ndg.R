@@ -1,4 +1,5 @@
-setwd("~/morphs-analysis/")  ###change this to actual location of repo
+wd <- "~/morphs-analysis/"
+setwd(wd)  ###change this to actual location of repo
 
 library(stats)
 
@@ -219,7 +220,7 @@ model <- function(alpha, utt.cost, thetaGtr, label) {
 
 timestamp <- as.character(unclass(Sys.time()))
 
-mainDir <- "~/morphs-analysis/"
+mainDir <- wd
 subDir <- paste(c("output", timestamp), collapse="")
 
 if (!(file.exists(subDir))) {
