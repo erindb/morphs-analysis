@@ -198,48 +198,46 @@ logistic <- function(v) {
 }
 
 #horribly messy graph function
-kernel.dense.plot <- function(model.runs, c, label, range) {
-  n.samples <- length(model.runs[["down"]][["none"]][["samples"]][,"degree"])
+kernel.dens.plot <- function(model.runs, label) {
+  n.samples <- length(model.runs[["down"]][["no-utt"]][["samples"]][,"degree"])
   distributions <- myapply(function(d,u) {
     return(rep(d, n.samples))
   })
   modifiers <- myapply(function(d,u) {
     return(rep(u, n.samples))
   })
-  samples <- myapply(function(d,u) {
-    return(model.runs[[d]][[u]][["samples"]][[,"degree"]])
+  mp <- myapply(function(d,u) {
+    df <- model.runs[[d]][[u]]
+    return(df[["samples"]][,"degree"])
   })
-  mydata <- data.frame(dist=distributions, mod=modifiers, mp=samples)
+  mydata <- data.frame(dist=distributions, mod=modifiers, mp=mp)
   png(paste(c(label, "-kernel-dens-est.png"), collapse=""), 2200, 1500, pointsize=32)
   par(mfrow=c(3,4))
   lapply(dists, function(d) {
     f <- density(logit(examples[[d]]), kernel=k.type, bw=bw)
-    if (d == "unif") {
-      xlab <- "feppiness"
-      ylab <- "density"
-    } else {
+#     if (d == "unif") {
+#       xlab <- "feppiness"
+#       ylab <- "density"
+#     } else {
       xlab=""
       ylab=""
-    }
+#     }
     plot(logistic(f$x), f$y, type="l", main="", xlab=xlab, ylab=ylab, xlim=c(0,1),
          font.main=32, lwd=3)
-    lapply(mods, function(m) {
-      if (d == "unif" && m == "none") {
-        xlab <- "feppiness"
-        ylab <- "density"
-      } else {
+    lapply(possible.utterances, function(m) {
+#       if (d == "unif" && m == "no-utt") {
+#         xlab <- "feppiness"
+#         ylab <- "density"
+#       } else {
         xlab=""
         ylab=""
-      }
+#       }
       samples <- mydata$mp[mydata$dist == d & mydata$mod == m]
-      low <- c[["low"]][[m, d]]
-      high <- c[["high"]][[m, d]]
       f <- density(logit(samples), kernel=k.type, bw=bw)
-      plot(logistic(f$x), f$y, type="l", main="", ylab=ylab, xlab=xlab, xlim=range,
+      plot(logistic(f$x), f$y, type="l", main="", ylab=ylab, xlab=xlab, xlim=c(0,1),
            font.main=32, lwd=3)
       mu <- mean(samples)
       abline(v = mu, col="blue", lwd=7)
-      arrows(low, max(f$y)/2, x1=high, lwd=5, code=3, angle=90)
     })
   })
   dev.off()
@@ -247,7 +245,7 @@ kernel.dense.plot <- function(model.runs, c, label, range) {
 
 #run model with these values of parameters
 model <- function(alpha, utt.cost, thetaGtr, label) {
-  n.true.samples <- 30000 #number of samples to keep
+  n.true.samples <- 100#30000 #number of samples to keep
   lag <- 5 #number of samples to skip over
   burn.in <- 10
   n.samples <- n.true.samples * lag + burn.in
@@ -266,6 +264,7 @@ model <- function(alpha, utt.cost, thetaGtr, label) {
     return(run)
   })
   names(model.runs) <- dists
+  kernel.dens.plot(model.runs, label)
   
   graph.dist <- myapply(function(d,u){return(d)})
   graph.utterance <- myapply(function(d,u){return(u)})
