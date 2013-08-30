@@ -24,7 +24,8 @@ examples <- list(down.examples, mid.examples, unif.examples)
 names(examples) <- c("down", "mid", "unif")
 possible.utterances = c('no-utt', 'pos', 'very pos') #probably OK since Ss see all of
                                                      #these in same page
-utterance.lengths = c(0,1,2)
+#utterance.lengths = c(0,1,2)
+utterance.lengths = c(0,1,4)
 utterance.polarities = c(0,+1,+1)
 
 #using r function density to find kernal density, so it's not actually continuous
@@ -94,11 +95,7 @@ speaker1 = function(thetas.idx, degree.idx, utterance.idx, alpha, utt.cost, pdf,
     utt.probs = array(0,dim=c(length(possible.utterances)))
     for(i in 1:length(possible.utterances)) {
       l0 = listener0(i, thetas.idx, degree.idx, pdf, cdf, thetaGtr)
-      if (possible.utterances[[i]] == "very pos") {
-        utt.probs[i] <- (l0^alpha) * exp(-alpha * very.cost)
-      } else {
-        utt.probs[i] <- (l0^alpha) * exp(-alpha * utt.cost)
-      }
+      utt.probs[i] <- (l0^alpha) * exp(-alpha * utt.cost *  utterance.lengths[i])
     }
     S1.cache[degree.idx,thetas.idx[1],thetas.idx[2],] <<- utt.probs/sum(utt.probs)
 	}
@@ -234,7 +231,7 @@ kernel.dens.plot <- function(model.runs, label) {
       plot(logistic(f$x), f$y, type="l", main="", ylab=ylab, xlab=xlab, xlim=c(0,1),
            font.main=32, lwd=3)
       mu <- mean(samples)
-      abline(v = mu, col="blue", lwd=7)
+      #(v = mu, col="blue", lwd=7)
     })
   })
   dev.off()
@@ -276,8 +273,8 @@ model <- function(alpha, utt.cost, thetaGtr, label, tolerance, adjust, very.cost
   graph.data <- (matrix(data=graph.means, nrow=3, ncol=3,
                         dimnames=list(c("none", "adj", "very"),
                                       c("peakedDown", "peakedMid", "uniform"))))
-  png(paste(c(label, ".png"), collapse=""))
-  graph.title <- paste(c("model alpha=", alpha, ", cost=", utt.cost), collapse="")
+  png(paste(c(label, ".png"), collapse=""), 1200, 800, pointsize=32)
+  graph.title <- "Model"#paste(c("model alpha=", alpha, ", cost=", utt.cost), collapse="")
   novel.adj.bar <- barplot(as.matrix(graph.data), main=graph.title,
                            ylab="feppiness", beside=TRUE, col=rainbow(3), ylim=c(0,1))
   legend("topleft", c("wug", "feppy wug", "very feppy wug"), cex=0.6, bty="n", fill=rainbow(3));
@@ -303,19 +300,20 @@ time.label <- function(alpha, cost, tol, adj, i, very.cost) {
 expt.means <- c(0.3774988, 0.2063296, 0.4692256, 0.6403353, 0.5309518,
                 0.8261740, 0.6875057, 0.5141071, 0.9364525) #from analyze_morphs.R
 #run the model with different values of free parameters
-sapply(c(1,5,10), function(alpha) {
-  sapply(c(1,2), function(adj) {
-    sapply(c(4,5,6), function(very.cost) {
-      tol <- 0.001
-      cost <- 1
-      i <- 1
-      file.label <- time.label(alpha, cost, tol, adj, i, very.cost)
-      model(alpha=alpha, utt.cost=cost, thetaGtr=F,
-            label=file.label, tol, adj, very.cost)
-      model.means <- read.table(paste(c(file.label, "-means.data"), collapse=""))
-      print(paste("Correlation: ", cor(model.means, expt.means)))
-      print(paste("Cost of Very: ", very.cost))
-      print(paste("bandwidth adjustment: ", adj))
+sapply(1:1, function(i) {
+  sapply(c(5), function(alpha) {
+    sapply(c(2), function(adj) {
+      sapply(c(4), function(very.cost) {
+        tol <- 0.001
+        cost <- 1
+        file.label <- time.label(alpha, cost, tol, adj, i, very.cost)
+        model(alpha=alpha, utt.cost=cost, thetaGtr=F,
+              label=file.label, tol, adj, very.cost)
+        model.means <- read.table(paste(c(file.label, "-means.data"), collapse=""))
+        print(paste("Correlation: ", cor(model.means, expt.means)))
+        print(paste("Cost of Very: ", very.cost))
+        print(paste("bandwidth adjustment: ", adj))
+      })
     })
   })
 })
