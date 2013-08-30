@@ -3,7 +3,7 @@ setwd("~/morphs-analysis/")  ###change this to actual location of repo
 library(stats)
 
 #for speaker1 discretization:
-grid.steps = 100
+grid.steps = 32
 grid = seq(0,1,length.out=grid.steps)
 cache.index = function(v) {
   return(1+round(v*(grid.steps-1)))
@@ -23,9 +23,11 @@ examples <- list(down.examples, mid.examples, unif.examples)
 names(examples) <- c("down", "mid", "unif")
 possible.utterances = c('no-utt', 'pos', 'very pos') #probably OK since Ss see all of
                                                      #these in same page
+utterance.lengths = c(0,1,2)
+utterance.polarities = c(0,+1,+1)
 
 #using r function density to find kernal density, so it's not actually continuous
-kernel.granularity <- grid.steps#2^12 #how many points are calculated for the kernel density estimate
+kernel.granularity <- grid.steps #2^12 #how many points are calculated for the kernel density estimate
 est.kernel <- function(dist, bw) {
   return(density(examples[[dist]], from=0, to=1, n=kernel.granularity,
                  kernel="gaussian", bw=bw, adjust=1))
@@ -33,47 +35,19 @@ est.kernel <- function(dist, bw) {
 
 #norms the kernel density
 #takes in all the points where kernel density is estimated
-make.pdf <- function(kernel.est) {
+make.pdf.cache <- function(kernel.est) {
   area <- sum(kernel.est$y) 
   normed.dens <- kernel.est$y/area
-  return(function(x){
-    if (x < 0 || x > 1) {
-      return(0)
-    } else {
-      return(normed.dens[cache.index(x)]/area)
-    }
-  })
+  return(normed.dens)
 }
 
 #creates fn that approximates percentage of area before x
 #takes in all the points where kernel density is estimated
-make.cdf <- function(kernel.est) {
+make.cdf.cache <- function(kernel.est) {
   area <- sum(kernel.est$y) #total area covered by kernel
-                                                 #density estimate
+  #density estimate
   cumulants <- cumsum(kernel.est$y/area)
-  
-  return(function(x){
-    if (x <= 0) {
-      return(0)
-    } else if (x >= 1) {
-      return(1)
-    } else {
-      return(cumulants[cache.index(x)])
-    }
-  })
-}
-
-#erin did not change this fn
-polarity = function(utterance) {
-	if (utterance == 'pos' || utterance == 'very pos' || utterance == 'pos1' ||
-      utterance == 'very pos1' || utterance == 'pos2' || utterance == 'pos3') {
-		return('positive')
-	} else if (utterance == 'neg' || utterance == 'very neg' || utterance == 'neg1' ||
-             utterance == 'very neg1' || utterance == 'neg2' || utterance == 'neg3') {
-		return('negative')
-	} else {
-		print("Error in function polarity: unknown utterance")
-	}
+  return(cumulants)
 }
 
 L0.cache <- array(NA,dim = c(grid.steps,grid.steps,grid.steps,length(possible.utterances)))
@@ -85,64 +59,48 @@ clear.cache = function(){
 }
 
 #todo: put back erin's Gtr test..
-listener0 = function(utterance, thetas, degree, pdf, cdf, thetaGtr) {
-  #round to grid. note: i do this too many times overall...
-  d = cache.index(degree)
-  t1 = cache.index(thetas[1])
-  t2 = cache.index(thetas[2])
-  ut = which(possible.utterances == utterance)
+listener0 = function(utterance.idx, thetas.idx, degree.idx, pdf, cdf, thetaGtr) {
   
-  if(is.na(L0.cache[d,t1,t2,ut])) {
-    theta = if(ut==2){grid[t1]} else {grid[t2]}
+  if(is.na(L0.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx])) {
+    theta = if(utterance.idx==2){grid[t1]} else {grid[t2]}
     deg = grid[d]
-    if (utterance == 'no-utt') {
-      L0.cache[d,t1,t2,ut] <- pdf(deg)
-    }	else if(polarity(utterance) == 'positive') {
-      L0.cache[d,t1,t2,ut] <- (deg >= theta) * pdf(deg) / 1-cdf(theta)
+    if (utterance.idx == 1) { #assume the null utterance
+    L0.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx] <- pdf[degree.idx]
+    }	else if(utterance.polarities[utterance.idx] == +1) {
+      theta.idx = thetas.idx[utterance.idx-1]
+      theta = grid[theta.idx]
+      L0.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx] <- (deg >= theta) * pdf[degree.idx] / 1-cdf[theta.idx]
     } else {
-      L0.cache[d,t1,t2,ut] <- (deg <= theta) * pdf(deg) / cdf(theta)
+      theta.idx = thetas.idx[utterance.idx-1]
+      theta = grid[theta.idx]
+      L0.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx] <- (deg <= theta) * pdf[degree.idx] / cdf[theta.idx]
     }
   }
-  return(L0.cache[d,t1,t2,ut])
+  return(L0.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx])
 }
 
-#erin did not change this fn
-mylnth = function(u) {
-	if (u == 'no-utt') {
-		return(0)
-	} else if (u=='very pos' || u=='very neg') {
-		return(2)
-	} else {
-		return(1)
-	}
-}
-
-speaker1 = function(thetas, degree, utterance, alpha, utt.cost, pdf, cdf, thetaGtr) {
-  #round to grid. 
-  d = cache.index(degree)
-  t1 = cache.index(thetas[1])
-  t2 = cache.index(thetas[2])
-  ut = which(possible.utterances == utterance)
-  
-  eval.utt = function(utt) {
-		l0 = listener0(utt, thetas, degree, pdf, cdf, thetaGtr)
-		return( (l0^alpha) * exp(-alpha * utt.cost *  mylnth(utt)))
+speaker1 = function(thetas.idx, degree.idx, utterance.idx, alpha, utt.cost, pdf, cdf, thetaGtr) {
+ 
+  if(is.na(S1.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx])) {
+    utt.probs = array(0,dim=c(length(possible.utterances)))
+    for(i in 1:length(possible.utterances)) {
+      l0 = listener0(i, thetas.idx, degree.idx, pdf, cdf, thetaGtr)
+      utt.probs[i] <- (l0^alpha) * exp(-alpha * utt.cost *  utterance.lengths[i])
+    }
+    S1.cache[degree.idx,thetas.idx[1],thetas.idx[2],] <- utt.probs/sum(utt.probs)
 	}
   
-	if(is.na(S1.cache[d,t1,t2,ut])) {
-    utt.probs = sapply(possible.utterances, FUN=eval.utt)
-    S1.cache[d,t1,t2,] <- utt.probs/sum(utt.probs)
-	}
-  
-	return(S1.cache[d,t1,t2,ut])
+	return(S1.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx])
 }
 
 listener1 = function(utterance, alpha, utt.cost, n.samples, step.size,
                      dist, band.width, thetaGtr) {
   
+  utt.idx = which(possible.utterances == utterance)
+  
   kernel.est <- est.kernel(dist, band.width)
-  pdf <- make.pdf(kernel.est)
-  cdf <- make.cdf(kernel.est)
+  pdf <- make.pdf.cache(kernel.est)
+  cdf <- make.cdf.cache(kernel.est)
     
   dim1 <- paste('samp', 1:n.samples, sep='')
   dim2 <- c('degree', paste('theta.', possible.utterances[-1], sep=''))
@@ -156,10 +114,12 @@ listener1 = function(utterance, alpha, utt.cost, n.samples, step.size,
     if (any(state < 0) || any(state > 1)) {return(0)}
     degree = state[1]
     thetas = state[2:length(state)]
+    degree.idx = cache.index(degree)
+    thetas.idx = c(cache.index(thetas[1]), cache.index(thetas[2]))#sapply(thetas,cache.index)
     #prior for degree (thetas have unif prior):
-    prior = pdf(degree)
+    prior = pdf[degree.idx]
     #probbaility speaker would have said this (given state):
-    likelihood = speaker1(thetas, degree, utterance, alpha, utt.cost, pdf, cdf, thetaGtr)
+    likelihood = speaker1(thetas.idx, degree.idx, utt.idx, alpha, utt.cost, pdf, cdf, thetaGtr)
     return(prior*likelihood)
   }
   
@@ -202,7 +162,7 @@ listener1 = function(utterance, alpha, utt.cost, n.samples, step.size,
 
 #run model with these values of parameters
 model <- function(alpha, utt.cost, thetaGtr, label) {
-  n.true.samples <- 100#30000 #number of samples to keep
+  n.true.samples <- 1000#30000 #number of samples to keep
   lag <- 5#50 #number of samples to skip over
   burn.in <- 10#5000
   n.samples <- n.true.samples * lag + burn.in
