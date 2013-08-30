@@ -35,7 +35,7 @@ getVal <- function(tag) {
 error.bar <- function(x, y, upper, lower=upper, length=0.1,...){
   if(length(x) != length(y) | length(y) !=length(lower) | length(lower) != length(upper))
     stop("vectors must be same length")
-  arrows(x, upper, x, lower, angle=90, code=3, length=length, ...)
+  arrows(x, upper, x, lower, angle=90, code=3, lwd=2, length=length, ...)
 }
 
 
@@ -327,7 +327,7 @@ mygraph <- function(mydata, range, mytitle) {
   graph.data <- (matrix(data=unlist(mp), nrow=3, ncol=3,
                        dimnames=list(c("none", "adj", "very"),
                                      c("peakedDown", "peakedMid", "uniform"))))
-  novel.adj.bar <- barplot(as.matrix(graph.data), main=mytitle,
+  novel.adj.bar <- barplot(as.matrix(graph.data), main=mytitle, font.main=12,
                            ylab="feppiness", beside=TRUE, col=rainbow(3), ylim=range)
   legend("topleft", c("wug", "feppy wug", "very feppy wug"), cex=0.6, bty="n", fill=rainbow(3));
   
@@ -354,19 +354,102 @@ mygraph <- function(mydata, range, mytitle) {
                         dimnames=list(c("none", "adj", "very"),
                                       c("peakedDown", "peakedMid", "uniform"))))
   error.bar(novel.adj.bar, as.matrix(graph.data), higher, lower)
+  colnames(lower) <- c("down", "mid", "unif")
+  colnames(higher) <- c("down", "mid", "unif")
+  conf <- list(lower,higher)
+  names(conf) <- c("low", "high")
+  return(conf)
 }
 
-mygraph(good.data, c(0,1), "Novel Adj Scale")
-mygraph(z.data, c(-1.5,1.5), "Novel Adj Scale (z-scored)")
+png("morphs-bar.png", 1200, 800, pointsize=32)
+conf <- mygraph(good.data, c(0,1), "Novel Adj Scale")
+dev.off()
+png("morphs-bar-zscores.png", 1200, 800, pointsize=32)
+z.conf <- mygraph(z.data, c(-1.5,1.5), "Novel Adj Scale (z-scored)")
+dev.off()
 
 
 
-par(mfrow=c(3,3))
-lapply(dists, function(d) {
-  lapply(mods, function(m) {
-    samples <- good.data$mp[good.data$dist == d & good.data$mod == m]
-    f <- density(samples, kernel="gaussian", bw="nrd", from=0, to=1)
-    plot(f$x, f$y, type="l", main=paste(d, m))
-    abline(v = mean(samples), col="blue")
+down.examples <- c(0.04583, 0.003231, 0.07391, 0.01884, 0.00003024, 0.04158,
+                   0.09081, 0.06746, 0.01949, 0.1007, 0.1633, 0.1441, 0.1655,
+                   0.2697, 0.2161)
+mid.examples <- c(0.31404, 0.30456, 0.39520, 0.56064, 0.49728, 0.53187, 0.55993,
+                  0.47519, 0.54332, 0.48362, 0.51678, 0.44763, 0.68272, 0.61375,
+                  0.69832)
+unif.examples <- c(0.9730805, 0.0589135, 0.1332413, 0.5568001, 0.6201130, 0.4243146,
+                   0.4176713, 0.2215742, 0.6778150, 0.6834636, 0.8716204, 0.5641932,
+                   0.3503760, 0.9606276, 0.0048311)
+examples <- list(down.examples, mid.examples, unif.examples)
+names(examples) <- c("down", "mid", "unif")
+
+bw <- "sj"
+#k.type <- "epanechnikov"
+#k.type <- "biweight"
+k.type <- "gaussian"
+
+convert.logit <- F
+
+logit <- function(v) {
+  if (convert.logit) {
+    return(sapply(v, function(p) {
+      return(log(p) - log(1-p))
+    }))
+  } else {
+    return(v)
+  }
+}
+
+logistic <- function(v) {
+  if (convert.logit) {
+    return(sapply(v, function(x) {
+      return(1/(1+exp(-x)))
+    }))
+  } else {
+    return(v)
+  }
+}
+
+kernel.dense.plot <- function(mydata, label="", logit, c, range) {
+  png(paste(c(label, "morphs-kernel-density-estimates.png"), collapse=""), 2200, 1500, pointsize=32)
+  par(mfrow=c(3,4))
+  lapply(dists, function(d) {
+    convert.logit <- T
+    f <- density(logit(examples[[d]]), kernel=k.type, bw=bw)
+    if (d == "unif") {
+      xlab <- "feppiness"
+      ylab <- "density"
+    } else {
+      xlab=""
+      ylab=""
+    }
+    plot(logistic(f$x), f$y, type="l", main="", xlab=xlab, ylab=ylab, xlim=c(0,1),
+         font.main=32, lwd=3)
+    lapply(mods, function(m) {
+      if (d == "unif" && m == "none") {
+        xlab <- "feppiness"
+        ylab <- "density"
+      } else {
+        xlab=""
+        ylab=""
+      }
+      if (logit) {
+        convert.logit <- T
+      } else {
+        convert.logit <- F
+      }
+      samples <- mydata$mp[mydata$dist == d & mydata$mod == m]
+      low <- c[["low"]][[m, d]]
+      high <- c[["high"]][[m, d]]
+      f <- density(logit(samples), kernel=k.type, bw=bw)
+      plot(logistic(f$x), f$y, type="l", main="", ylab=ylab, xlab=xlab, xlim=range,
+           font.main=32, lwd=3)
+      mu <- mean(samples)
+      abline(v = mu, col="blue", lwd=7)
+      arrows(low, max(f$y)/2, x1=high, lwd=5, code=3, angle=90)
+    })
   })
-})
+  dev.off()
+}
+
+kernel.dense.plot(good.data, "", logit=T, c=conf, range=c(0,1))
+kernel.dense.plot(z.data, "z-", logit=F, c=z.conf, range=c(-1.5, 1.5))

@@ -1,4 +1,4 @@
-setwd("~/Code/cocolab/analyzing_experiments/morphs-analysis/")  ###change this to actual location of repo
+setwd("~/morphs-analysis/")  ###change this to actual location of repo
 
 library(stats)
 
@@ -219,9 +219,9 @@ listener1 = function(utterance, alpha, utt.cost, n.samples, step.size,
 
 #run model with these values of parameters
 model <- function(alpha, utt.cost, thetaGtr, label) {
-  n.true.samples <- 10#30000 #number of samples to keep
-  lag <- 10#50 #number of samples to skip over
-  burn.in <- 10#5000
+  n.true.samples <- 30000 #number of samples to keep
+  lag <- 50 #number of samples to skip over
+  burn.in <- 5000
   n.samples <- n.true.samples * lag + burn.in
   step.size <- 0.005
   dists <- c("down", "mid", "unif")
@@ -267,7 +267,7 @@ model <- function(alpha, utt.cost, thetaGtr, label) {
 
 timestamp <- as.character(unclass(Sys.time()))
 
-mainDir <- "~/Code/cocolab/analyzing_experiments/morphs-analysis/"
+mainDir <- "~/morphs-analysis/"
 subDir <- paste(c("output", timestamp), collapse="")
 
 if (!(file.exists(subDir))) {
@@ -275,16 +275,10 @@ if (!(file.exists(subDir))) {
 }
 
 time.label <- function(identifier) {
-  return(paste(c("output", timestamp, "/", identifier), collapse=""))
+  return(paste(c("output", timestamp, "/", timestamp, identifier), collapse=""))
 }
 
 #run the model with different values of free parameters
-model(alpha=1, utt.cost=2, thetaGtr=T, label=time.label("alpha1cost2thetaGtr"))
-model(alpha=1, utt.cost=2, thetaGtr=F, label=time.label("alpha1cost2"))
-model(alpha=1, utt.cost=5, thetaGtr=F, label=time.label("alpha1cost5"))
-model(alpha=2, utt.cost=2, thetaGtr=T, label=time.label("alpha2cost2thetaGtr"))
-model(alpha=2, utt.cost=2, thetaGtr=F, label=time.label("alpha2cost2"))
-model(alpha=2, utt.cost=5, thetaGtr=F, label=time.label("alpha2cost5"))
-model(alpha=4, utt.cost=2, thetaGtr=T, label=time.label("alpha4cost2thetaGtr"))
-model(alpha=4, utt.cost=2, thetaGtr=F, label=time.label("alpha4cost2"))
-model(alpha=4, utt.cost=5, thetaGtr=F, label=time.label("alpha4cost5"))
+sapply(1:10, function(i) {
+  model(alpha=1,utt.cost=1,thetaGtr=F,label=time.label("#alpha1cost1"))
+})
