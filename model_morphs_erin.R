@@ -37,8 +37,8 @@ est.kernel <- function(dist, bw, adjust) {
 
 #norms the kernel density
 #takes in all the points where kernel density is estimated
-make.pdf.cache <- function(kernel.est, tolerance) {
-  k = kernel.est$y + tolerance#0.00000001
+make.pdf.cache <- function(kernel.est) {
+  k = kernel.est$y + 0.0001
   area <- sum(k) 
   normed.dens <- k/area
   return(normed.dens)
@@ -104,13 +104,13 @@ speaker1 = function(thetas.idx, degree.idx, utterance.idx, alpha, utt.cost, pdf,
 }
 
 listener1 = function(utterance, alpha, utt.cost, n.samples, step.size,
-                     dist, band.width, thetaGtr, tolerance, adjust, very.cost) {
+                     dist, band.width, thetaGtr, adjust) {
   
   utt.idx = which(possible.utterances == utterance)
   
   kernel.est <- est.kernel(dist, band.width, adjust)
-  pdf <- make.pdf.cache(kernel.est, tolerance)
-  cdf <- make.cdf.cache(kernel.est, tolerance)
+  pdf <- make.pdf.cache(kernel.est)
+  cdf <- make.cdf.cache(kernel.est)
     
   dim1 <- paste('samp', 1:n.samples, sep='')
   dim2 <- c('degree', paste('theta.', possible.utterances[-1], sep=''))
@@ -180,13 +180,13 @@ myapply <- function(f) {
 }
 
 logit <- function(v) {
-  return(sapply(v, function(p) {
+    return(sapply(v, function(p) {
       return(log(p) - log(1-p))
     }))
 }
 
 logistic <- function(v) {
-  return(sapply(v, function(x) {
+    return(sapply(v, function(x) {
       return(1/(1+exp(-x)))
     }))
 }
@@ -208,7 +208,7 @@ kernel.dens.plot <- function(model.runs, label) {
   png(paste(c(label, "-kernel-dens-est.png"), collapse=""), 2200, 1500, pointsize=32)
   par(mfrow=c(3,4))
   lapply(dists, function(d) {
-    f <- density(logit(examples[[d]]), kernel="gaussian", bw="SJ")
+    f <- density(logit(examples[[d]]), kernel="gaussian", bw="sj")
 #     if (d == "unif") {
 #       xlab <- "feppiness"
 #       ylab <- "density"
@@ -227,7 +227,7 @@ kernel.dens.plot <- function(model.runs, label) {
         ylab=""
 #       }
       samples <- mydata$mp[mydata$dist == d & mydata$mod == m]
-      f <- density(logit(samples), kernel="gaussian", bw="SJ")
+      f <- density(logit(samples), kernel="gaussian", bw="sj")
       plot(logistic(f$x), f$y, type="l", main="", ylab=ylab, xlab=xlab, xlim=c(0,1),
            font.main=32, lwd=3)
       mu <- mean(samples)
@@ -238,8 +238,8 @@ kernel.dens.plot <- function(model.runs, label) {
 }
 
 #run model with these values of parameters
-model <- function(alpha, utt.cost, thetaGtr, label, tolerance, adjust, very.cost) {
-  n.true.samples <- 5000#30000 #number of samples to keep
+model <- function(alpha, utt.cost, thetaGtr, label, adjust) {
+  n.true.samples <- 3000#30000 #number of samples to keep
   lag <- 5 #number of samples to skip over
   burn.in <- 10
   n.samples <- n.true.samples * lag + burn.in
@@ -249,8 +249,7 @@ model <- function(alpha, utt.cost, thetaGtr, label, tolerance, adjust, very.cost
     clear.cache()
     return(lapply(possible.utterances, function(utterance) {
       listener1(utterance, alpha=alpha, utt.cost=utt.cost, n.samples=n.samples,
-                step.size=step.size, dist=dist, band.width="SJ", thetaGtr=thetaGtr,
-                tolerance, adjust, very.cost)
+                step.size=step.size, dist=dist, band.width="SJ", thetaGtr=thetaGtr, adjust)
     }))
   })
   model.runs <- lapply(model.runs, function(run) {
@@ -279,6 +278,7 @@ model <- function(alpha, utt.cost, thetaGtr, label, tolerance, adjust, very.cost
                            ylab="feppiness", beside=TRUE, col=rainbow(3), ylim=c(0,1))
   legend("topleft", c("wug", "feppy wug", "very feppy wug"), cex=0.6, bty="n", fill=rainbow(3));
   dev.off()
+  return(graph.means)
 }
 
 timestamp <- as.character(unclass(Sys.time()))
@@ -290,29 +290,22 @@ if (!(file.exists(subDir))) {
   dir.create(file.path(mainDir, subDir))
 }
 
-time.label <- function(alpha, cost, tol, adj, i, very.cost) {
-  return(paste(c("output", timestamp, "/alpha", alpha, "_cost", cost,
-                 "_tol", tol, "_adjust", adj, "_very", very.cost,
-                 "_run", i), collapse=""))
+time.label <- function(alpha, cost, very.len, adjust, i) {
+  return(paste(c("output", timestamp, "/alpha", alpha, "_cost", cost, "_very.len", very.len,
+                 "_adjust", adjust, "_run", i), collapse=""))
 }
 
-
-expt.means <- c(0.3774988, 0.2063296, 0.4692256, 0.6403353, 0.5309518,
-                0.8261740, 0.6875057, 0.5141071, 0.9364525) #from analyze_morphs.R
+expt.means <- c(0.3774988, 0.2063296, 0.4692256, 0.6403353, 0.5309518, 0.8261740, 0.6875057, 0.5141071, 0.9364525)
 #run the model with different values of free parameters
 sapply(1:1, function(i) {
-  sapply(c(5), function(alpha) {
-    sapply(c(2), function(adj) {
-      sapply(c(4), function(very.cost) {
-        tol <- 0.001
-        cost <- 1
-        file.label <- time.label(alpha, cost, tol, adj, i, very.cost)
-        model(alpha=alpha, utt.cost=cost, thetaGtr=F,
-              label=file.label, tol, adj, very.cost)
-        model.means <- read.table(paste(c(file.label, "-means.data"), collapse=""))
-        print(paste("Correlation: ", cor(model.means, expt.means)))
-        print(paste("Cost of Very: ", very.cost))
-        print(paste("bandwidth adjustment: ", adj))
+  sapply(c(1,5,10), function(alpha) {
+    sapply(c(1), function(cost) {
+      sapply(c(1,2,3,4), function(adjust) {
+      model.means <- model(alpha=alpha, utt.cost=cost, thetaGtr=F,
+                           label=time.label(alpha, cost, 2, adjust, i), adjust)
+      print(paste("Correlation:", cor(model.means, expt.means)))
+      print(paste("adjust:", adjust))
+      print(paste("alpha:", alpha))
       })
     })
   })
