@@ -289,7 +289,7 @@ model <- function(alpha, utt.cost, thetaGtr, label, adjust) {
                         dimnames=list(c("none", "adj", "very"),
                                       c("peakedDown", "peakedMid", "uniform"))))
   png(paste(c(label, ".png"), collapse=""), 1200, 800, pointsize=32)
-  graph.title <- paste(c("model alpha=", alpha, ", cost=", utt.cost), collapse="")
+  graph.title <- "Novel Adjective Model"
   novel.adj.bar <- barplot(as.matrix(graph.data), main=graph.title,
                            ylab="feppiness", beside=TRUE, col=rainbow(3), ylim=c(0,1))
   legend("topleft", c("wug", "feppy wug", "very feppy wug"), cex=0.6, bty="n", fill=rainbow(3));
