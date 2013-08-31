@@ -362,7 +362,7 @@ mygraph <- function(mydata, range, mytitle) {
 }
 
 png("morphs-bar.png", 1200, 800, pointsize=32)
-conf <- mygraph(good.data, c(0,1), "Novel Adj Scale")
+conf <- mygraph(good.data, c(0,1), "Novel Adjective Experiment")
 dev.off()
 png("morphs-bar-zscores.png", 1200, 800, pointsize=32)
 z.conf <- mygraph(z.data, c(-1.5,1.5), "Novel Adj Scale (z-scored)")
@@ -382,10 +382,10 @@ unif.examples <- c(0.9730805, 0.0589135, 0.1332413, 0.5568001, 0.6201130, 0.4243
 examples <- list(down.examples, mid.examples, unif.examples)
 names(examples) <- c("down", "mid", "unif")
 
-bw <- "sj"
+my.bw <- "sj"
 #k.type <- "epanechnikov"
 #k.type <- "biweight"
-k.type <- "gaussian"
+#k.type <- "gaussian"
 
 convert.logit <- F
 
@@ -413,8 +413,20 @@ kernel.dense.plot <- function(mydata, label="", logit, c, range) {
   png(paste(c(label, "morphs-kernel-density-estimates.png"), collapse=""), 2200, 1500, pointsize=32)
   par(mfrow=c(3,4))
   lapply(dists, function(d) {
-    convert.logit <- T
-    f <- density(logit(examples[[d]]), kernel=k.type, bw=bw)
+    #convert.logit <- T
+    
+    down.examples <- c(0.04583, 0.003231, 0.07391, 0.01884, 0.00003024, 0.04158,
+                       0.09081, 0.06746, 0.01949, 0.1007, 0.1633, 0.1441, 0.1655,
+                       0.2697, 0.2161)
+    mid.examples <- c(0.31404, 0.30456, 0.39520, 0.56064, 0.49728, 0.53187, 0.55993,
+                      0.47519, 0.54332, 0.48362, 0.51678, 0.44763, 0.68272, 0.61375,
+                      0.69832)
+    unif.examples <- c(0.9730805, 0.0589135, 0.1332413, 0.5568001, 0.6201130, 0.4243146,
+                       0.4176713, 0.2215742, 0.6778150, 0.6834636, 0.8716204, 0.5641932,
+                       0.3503760, 0.9606276, 0.0048311)
+    examples <- list(down.examples, mid.examples, unif.examples)
+    names(examples) <- c("down", "mid", "unif")
+    f <- density(logit(examples[[d]]), kernel="gaussian", bw="sj")
     if (d == "unif") {
       xlab <- "feppiness"
       ylab <- "density"
@@ -432,33 +444,37 @@ kernel.dense.plot <- function(mydata, label="", logit, c, range) {
         xlab=""
         ylab=""
       }
-      if (logit) {
-        convert.logit <- T
-      } else {
-        convert.logit <- F
-      }
+#       if (logit) {
+#         convert.logit <- T
+#       } else {
+#         convert.logit <- F
+#       }
       otherdists <- dists[dists != d]
-      samples <- mydata$mp[mydata$dist == d & mydata$mod == m &
-                             mydata$other.dist == otherdists[1]]
-#       low <- c[["low"]][[m, d]]
-#       high <- c[["high"]][[m, d]]
-      f <- density(logit(samples), kernel=k.type, bw=bw)
+      samples <- mydata$mp[mydata$dist == d & mydata$mod == m]
+      f <- density(logit(samples), kernel="gaussian", bw="sj")
       plot(logistic(f$x), f$y, type="l", main="", ylab=ylab, xlab=xlab, xlim=range,
            font.main=32, lwd=3, col="blue")
-      mu <- mean(samples)
-      abline(v = mu, col="blue", lwd=7)
-      #arrows(low, max(f$y)/2, x1=high, lwd=5, code=3, angle=90)
-      par(new=T)
-      samples <- mydata$mp[mydata$dist == d & mydata$mod == m &
-                             mydata$other.dist == otherdists[2]]
-#       low <- c[["low"]][[m, d]]
-#       high <- c[["high"]][[m, d]]
-      f <- density(logit(samples), kernel=k.type, bw=bw)
-      plot(logistic(f$x), f$y, type="l", main="", ylab=ylab, xlab=xlab, xlim=range,
-           font.main=32, lwd=3, col="green")
-      mu <- mean(samples)
-      abline(v = mu, col="green", lwd=7)
-      #arrows(low, max(f$y)/2, x1=high, lwd=5, code=3, angle=90)
+#       samples <- mydata$mp[mydata$dist == d & mydata$mod == m &
+#                              mydata$other.dist == otherdists[1]]
+# #       low <- c[["low"]][[m, d]]
+# #       high <- c[["high"]][[m, d]]
+#       f <- density(logit(samples), kernel="gaussian", bw="sj")
+#       plot(logistic(f$x), f$y, type="l", main="", ylab=ylab, xlab=xlab, xlim=range,
+#            font.main=32, lwd=3, col="blue")
+#       mu <- mean(samples)
+#       abline(v = mu, col="blue", lwd=7)
+#       #arrows(low, max(f$y)/2, x1=high, lwd=5, code=3, angle=90)
+#       par(new=T)
+#       samples <- mydata$mp[mydata$dist == d & mydata$mod == m &
+#                              mydata$other.dist == otherdists[2]]
+# #       low <- c[["low"]][[m, d]]
+# #       high <- c[["high"]][[m, d]]
+#       f <- density(logit(samples), kernel="gaussian", bw="sj")
+#       plot(logistic(f$x), f$y, type="l", main="", ylab=ylab, xlab=xlab, xlim=range,
+#            font.main=32, lwd=3, col="green")
+#       mu <- mean(samples)
+#       abline(v = mu, col="green", lwd=7)
+#       #arrows(low, max(f$y)/2, x1=high, lwd=5, code=3, angle=90)
     })
   })
   dev.off()
