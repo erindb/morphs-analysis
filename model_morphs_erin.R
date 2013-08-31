@@ -24,7 +24,7 @@ examples <- list(down.examples, mid.examples, unif.examples)
 names(examples) <- c("down", "mid", "unif")
 possible.utterances = c('no-utt', 'pos', 'very pos') #probably OK since Ss see all of
 #these in same page
-utterance.lengths = c(0,1,3)
+utterance.lengths = c(0,1,2)
 utterance.polarities = c(0,+1,+1)
 
 #using r function density to find kernal density, so it's not actually continuous
@@ -294,12 +294,14 @@ time.label <- function(alpha, cost, very.len, adjust, i) {
                  "_adjust", adjust, "_run", i), collapse=""))
 }
 
+convert.logit <- F
+
 expt.means <- c(0.3774988, 0.2063296, 0.4692256, 0.6403353, 0.5309518, 0.8261740, 0.6875057, 0.5141071, 0.9364525)
 #run the model with different values of free parameters
 sapply(1:1, function(i) {
-  sapply(c(1,5,10), function(alpha) {
+  sapply(c(1), function(alpha) {
     sapply(c(1), function(cost) {
-      sapply(c(1,2,3,4), function(adjust) {
+      sapply(c(1), function(adjust) {
         model.means <- model(alpha=alpha, utt.cost=cost, thetaGtr=F,
                              label=time.label(alpha, cost, 2, adjust, i), adjust)
         print(paste("Correlation:", cor(model.means, expt.means)))
