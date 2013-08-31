@@ -36,7 +36,7 @@ est.kernel <- function(dist, bw) {
 #norms the kernel density
 #takes in all the points where kernel density is estimated
 make.pdf.cache <- function(kernel.est) {
-  k = kernel.est$y + 0.00000001
+  k = kernel.est$y + 0.01
   area <- sum(k) 
   normed.dens <- k/area
   return(normed.dens)
