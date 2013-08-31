@@ -2,6 +2,7 @@
 #install.packages(c("R.basic"), contriburl="http://www.braju.com/R/repos/")
 library(rjson)
 library(stats)
+require(logspline)
 #library(plyr)
 #library(R.basic)
 
@@ -13,7 +14,7 @@ cutQuotes <- function(quoteyString) {
 }
 
 ################# reading and cleaning data for all pieces
-setwd("~/Code/cocolab/analyzing_experiments/morphs-analysis/")  ###change this to actual location of repo
+setwd("~/morphs-analysis/")  ###change this to actual location of repo
 rd <- read.table("morphs.results", sep="\t", quote='"', header=TRUE)
 
 adjectives <- lapply(as.character(rd$Answer.adjective), cutQuotes)
@@ -414,7 +415,11 @@ kernel.dense.plot <- function(mydata, label="", logit, c, range) {
   par(mfrow=c(3,4))
   lapply(dists, function(d) {
     convert.logit <- T
-    f <- density(logit(examples[[d]]), kernel=k.type, bw=bw)
+    #f <- density(logit(examples[[d]]), kernel=k.type, bw=bw)
+    f <- list()
+    f$x <- seq(0,1,length.out=512)
+    f$y <- dlogspline(f$x, logspline(examples[[d]], lbound=0,ubound=1))
+    f$y <- f$y/sum(f$y) #normalize
     if (d == "unif") {
       xlab <- "feppiness"
       ylab <- "density"
@@ -422,7 +427,7 @@ kernel.dense.plot <- function(mydata, label="", logit, c, range) {
       xlab=""
       ylab=""
     }
-    plot(logistic(f$x), f$y, type="l", main="", xlab=xlab, ylab=ylab, xlim=c(0,1),
+    plot(f$x, f$y, type="l", main="", xlab=xlab, ylab=ylab, xlim=c(0,1),
          font.main=32, lwd=3)
     lapply(mods, function(m) {
       if (d == "unif" && m == "none") {
@@ -442,8 +447,12 @@ kernel.dense.plot <- function(mydata, label="", logit, c, range) {
                              mydata$other.dist == otherdists[1]]
 #       low <- c[["low"]][[m, d]]
 #       high <- c[["high"]][[m, d]]
-      f <- density(logit(samples), kernel=k.type, bw=bw)
-      plot(logistic(f$x), f$y, type="l", main="", ylab=ylab, xlab=xlab, xlim=range,
+      #f <- density(logit(samples), kernel=k.type, bw=bw)
+      f <- list()
+      f$x <- seq(0,1,length.out=512)
+      f$y <- dlogspline(f$x, logspline(samples, lbound=0,ubound=1))
+      f$y <- f$y/sum(f$y)
+      plot(f$x, f$y, type="l", main="", ylab=ylab, xlab=xlab, xlim=range,
            font.main=32, lwd=3, col="blue")
       mu <- mean(samples)
       abline(v = mu, col="blue", lwd=7)
@@ -453,8 +462,12 @@ kernel.dense.plot <- function(mydata, label="", logit, c, range) {
                              mydata$other.dist == otherdists[2]]
 #       low <- c[["low"]][[m, d]]
 #       high <- c[["high"]][[m, d]]
-      f <- density(logit(samples), kernel=k.type, bw=bw)
-      plot(logistic(f$x), f$y, type="l", main="", ylab=ylab, xlab=xlab, xlim=range,
+      #f <- density(logit(samples), kernel=k.type, bw=bw)
+      f <- list()
+      f$x <- seq(0,1,length.out=512)
+      f$y <- dlogspline(f$x, logspline(samples, lbound=0,ubound=1))
+      f$y <- f$y/sum(f$y)
+      plot(f$x, f$y, type="l", main="", ylab=ylab, xlab=xlab, xlim=range,
            font.main=32, lwd=3, col="green")
       mu <- mean(samples)
       abline(v = mu, col="green", lwd=7)
@@ -465,4 +478,4 @@ kernel.dense.plot <- function(mydata, label="", logit, c, range) {
 }
 
 kernel.dense.plot(good.data, "", logit=T, c=conf, range=c(0,1))
-kernel.dense.plot(z.data, "z-", logit=F, c=z.conf, range=c(-1.5, 1.5))
+#kernel.dense.plot(z.data, "z-", logit=F, c=z.conf, range=c(-1.5, 1.5))
