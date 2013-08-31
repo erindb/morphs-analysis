@@ -23,9 +23,8 @@ unif.examples <- c(0.9730805, 0.0589135, 0.1332413, 0.5568001, 0.6201130, 0.4243
 examples <- list(down.examples, mid.examples, unif.examples)
 names(examples) <- c("down", "mid", "unif")
 possible.utterances = c('no-utt', 'pos', 'very pos') #probably OK since Ss see all of
-                                                     #these in same page
-#utterance.lengths = c(0,1,2)
-utterance.lengths = c(0,1,4)
+#these in same page
+utterance.lengths = c(0,1,3)
 utterance.polarities = c(0,+1,+1)
 
 #using r function density to find kernal density, so it's not actually continuous
@@ -46,8 +45,8 @@ make.pdf.cache <- function(kernel.est) {
 
 #creates fn that approximates percentage of area before x
 #takes in all the points where kernel density is estimated
-make.cdf.cache <- function(kernel.est, tolerance) {
-  cumulants <- cumsum(make.pdf.cache(kernel.est, tolerance))
+make.cdf.cache <- function(kernel.est) {
+  cumulants <- cumsum(make.pdf.cache(kernel.est))
   return(cumulants)
 }
 
@@ -58,7 +57,7 @@ S1.cache <- array(NA,dim = c(grid.steps,grid.steps,grid.steps,length(possible.ut
 cache.misses=0 #to track whether caching is working right.
 
 clear.cache = function(){
-  #print(paste("L0 cache NAs:", length(is.na(L0.cache))))
+  print(paste("L0 cache NAs:", length(is.na(L0.cache))))
   cache.misses<<-0
   L0.cache <<- array(NA,dim = c(grid.steps,grid.steps,grid.steps,length(possible.utterances)))
   S1.cache <<- array(NA,dim = c(grid.steps,grid.steps,grid.steps,length(possible.utterances)))
@@ -72,7 +71,7 @@ listener0 = function(utterance.idx, thetas.idx, degree.idx, pdf, cdf, thetaGtr) 
     theta.order = !(thetaGtr & (grid[thetas.idx[1]]>=grid[thetas.idx[2]]))
     if (utterance.idx == 1) { #assume the null utterance
       L0.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx] <<- theta.order* pdf[degree.idx]
-    }	else if(utterance.polarities[utterance.idx] == +1) {
+    }  else if(utterance.polarities[utterance.idx] == +1) {
       theta.idx = thetas.idx[utterance.idx-1]
       utt.true = grid[degree.idx] >= grid[theta.idx]  
       true.norm = if(theta.idx==1){1} else {1-cdf[theta.idx-1]}
@@ -88,8 +87,8 @@ listener0 = function(utterance.idx, thetas.idx, degree.idx, pdf, cdf, thetaGtr) 
   return(L0.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx])
 }
 
-speaker1 = function(thetas.idx, degree.idx, utterance.idx, alpha, utt.cost, pdf, cdf, thetaGtr, very.cost) {
- 
+speaker1 = function(thetas.idx, degree.idx, utterance.idx, alpha, utt.cost, pdf, cdf, thetaGtr) {
+  
   if(is.na(S1.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx])) {
     cache.misses <<- cache.misses + 1
     utt.probs = array(0,dim=c(length(possible.utterances)))
@@ -98,9 +97,9 @@ speaker1 = function(thetas.idx, degree.idx, utterance.idx, alpha, utt.cost, pdf,
       utt.probs[i] <- (l0^alpha) * exp(-alpha * utt.cost *  utterance.lengths[i])
     }
     S1.cache[degree.idx,thetas.idx[1],thetas.idx[2],] <<- utt.probs/sum(utt.probs)
-	}
+  }
   
-	return(S1.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx])
+  return(S1.cache[degree.idx,thetas.idx[1],thetas.idx[2],utterance.idx])
 }
 
 listener1 = function(utterance, alpha, utt.cost, n.samples, step.size,
@@ -111,13 +110,13 @@ listener1 = function(utterance, alpha, utt.cost, n.samples, step.size,
   kernel.est <- est.kernel(dist, band.width, adjust)
   pdf <- make.pdf.cache(kernel.est)
   cdf <- make.cdf.cache(kernel.est)
-    
+  
   dim1 <- paste('samp', 1:n.samples, sep='')
   dim2 <- c('degree', paste('theta.', possible.utterances[-1], sep=''))
   dimnames <- list(dim1, dim2)
-	samples = matrix(NA, nrow=n.samples, ncol=length(possible.utterances), dimnames=dimnames)
+  samples = matrix(NA, nrow=n.samples, ncol=length(possible.utterances), dimnames=dimnames)
   
-    
+  
   #scoring function, to compute (unormalized) probability of state. (should be in log domain?)
   prob.unnormed = function(state) {
     #check bounds:
@@ -127,7 +126,7 @@ listener1 = function(utterance, alpha, utt.cost, n.samples, step.size,
     #prior for degree (thetas have unif prior):
     prior = pdf[degree.idx]
     #probbaility speaker would have said this (given state):
-    likelihood = speaker1(thetas.idx, degree.idx, utt.idx, alpha, utt.cost, pdf, cdf, thetaGtr, very.cost)
+    likelihood = speaker1(thetas.idx, degree.idx, utt.idx, alpha, utt.cost, pdf, cdf, thetaGtr)
     return(prior*likelihood)
   }
   
@@ -150,8 +149,8 @@ listener1 = function(utterance, alpha, utt.cost, n.samples, step.size,
   #run mcmc chain:
   print("running mcmc")
   n.proposals.accepted = 0
-	for (i in 2:n.samples) {
-		proposal = make.proposal(state)
+  for (i in 2:n.samples) {
+    proposal = make.proposal(state)
     proposal.prob = prob.unnormed(proposal)
     #MH acceptance, assumes proposal is symmetric:
     if(runif(1,0,1) <= min(1, proposal.prob/state.prob)) {
@@ -159,15 +158,15 @@ listener1 = function(utterance, alpha, utt.cost, n.samples, step.size,
       state = proposal
       state.prob = proposal.prob
     }
-		samples[i,] = state
-	}
+    samples[i,] = state
+  }
   
   print("acceptance rate:")
   print(n.proposals.accepted/(n.samples-1))
   print("misses since last cache clear:")
   print(cache.misses)
   
-	return(list(samples=samples, prop.accepted=n.proposals.accepted/(n.samples-1)))
+  return(list(samples=samples, prop.accepted=n.proposals.accepted/(n.samples-1)))
 }
 
 dists <- c("down", "mid", "unif")
@@ -180,15 +179,15 @@ myapply <- function(f) {
 }
 
 logit <- function(v) {
-    return(sapply(v, function(p) {
-      return(log(p) - log(1-p))
-    }))
+  return(sapply(v, function(p) {
+    return(log(p) - log(1-p))
+  }))
 }
 
 logistic <- function(v) {
-    return(sapply(v, function(x) {
-      return(1/(1+exp(-x)))
-    }))
+  return(sapply(v, function(x) {
+    return(1/(1+exp(-x)))
+  }))
 }
 
 #horribly messy graph function
@@ -209,29 +208,29 @@ kernel.dens.plot <- function(model.runs, label) {
   par(mfrow=c(3,4))
   lapply(dists, function(d) {
     f <- density(logit(examples[[d]]), kernel="gaussian", bw="sj")
-#     if (d == "unif") {
-#       xlab <- "feppiness"
-#       ylab <- "density"
-#     } else {
-      xlab=""
-      ylab=""
-#     }
+    #     if (d == "unif") {
+    #       xlab <- "feppiness"
+    #       ylab <- "density"
+    #     } else {
+    xlab=""
+    ylab=""
+    #     }
     plot(logistic(f$x), f$y, type="l", main="", xlab=xlab, ylab=ylab, xlim=c(0,1),
          font.main=32, lwd=3)
     lapply(possible.utterances, function(m) {
-#       if (d == "unif" && m == "no-utt") {
-#         xlab <- "feppiness"
-#         ylab <- "density"
-#       } else {
-        xlab=""
-        ylab=""
-#       }
+      #       if (d == "unif" && m == "no-utt") {
+      #         xlab <- "feppiness"
+      #         ylab <- "density"
+      #       } else {
+      xlab=""
+      ylab=""
+      #       }
       samples <- mydata$mp[mydata$dist == d & mydata$mod == m]
       f <- density(logit(samples), kernel="gaussian", bw="sj")
       plot(logistic(f$x), f$y, type="l", main="", ylab=ylab, xlab=xlab, xlim=c(0,1),
            font.main=32, lwd=3)
       mu <- mean(samples)
-      #(v = mu, col="blue", lwd=7)
+      abline(v = mu, col="blue", lwd=7)
     })
   })
   dev.off()
@@ -239,7 +238,7 @@ kernel.dens.plot <- function(model.runs, label) {
 
 #run model with these values of parameters
 model <- function(alpha, utt.cost, thetaGtr, label, adjust) {
-  n.true.samples <- 3000#30000 #number of samples to keep
+  n.true.samples <- 10#3000#30000 #number of samples to keep
   lag <- 5 #number of samples to skip over
   burn.in <- 10
   n.samples <- n.true.samples * lag + burn.in
@@ -272,8 +271,8 @@ model <- function(alpha, utt.cost, thetaGtr, label, adjust) {
   graph.data <- (matrix(data=graph.means, nrow=3, ncol=3,
                         dimnames=list(c("none", "adj", "very"),
                                       c("peakedDown", "peakedMid", "uniform"))))
-  png(paste(c(label, ".png"), collapse=""), 1200, 800, pointsize=32)
-  graph.title <- "Model"#paste(c("model alpha=", alpha, ", cost=", utt.cost), collapse="")
+  png(paste(c(label, ".png"), collapse=""))
+  graph.title <- paste(c("model alpha=", alpha, ", cost=", utt.cost), collapse="")
   novel.adj.bar <- barplot(as.matrix(graph.data), main=graph.title,
                            ylab="feppiness", beside=TRUE, col=rainbow(3), ylim=c(0,1))
   legend("topleft", c("wug", "feppy wug", "very feppy wug"), cex=0.6, bty="n", fill=rainbow(3));
@@ -301,38 +300,12 @@ sapply(1:1, function(i) {
   sapply(c(1,5,10), function(alpha) {
     sapply(c(1), function(cost) {
       sapply(c(1,2,3,4), function(adjust) {
-      model.means <- model(alpha=alpha, utt.cost=cost, thetaGtr=F,
-                           label=time.label(alpha, cost, 2, adjust, i), adjust)
-      print(paste("Correlation:", cor(model.means, expt.means)))
-      print(paste("adjust:", adjust))
-      print(paste("alpha:", alpha))
+        model.means <- model(alpha=alpha, utt.cost=cost, thetaGtr=F,
+                             label=time.label(alpha, cost, 2, adjust, i), adjust)
+        print(paste("Correlation:", cor(model.means, expt.means)))
+        print(paste("adjust:", adjust))
+        print(paste("alpha:", alpha))
       })
     })
   })
 })
-
-# alphas <- c(1,5,10)
-# costs <- c(1,2,5)
-# sapply(alphas, function(alpha) {
-#   return(sapply(costs, function(cost) {
-#     i <- 1
-#     #print(paste(c(time.label(alpha, cost, i), "-means.data"), collapse=""))
-#     model.means <- read.table(paste(c(time.label(alpha, cost, i), "-means.data"), collapse=""))
-#     return(cor(model.means, expt.means))
-#   }))
-# })
-
-# cor <- sapply( c("output1377888015.16297/alpha1cost1run1-means.data",
-#           "output1377888015.16297/alpha1cost2run1-means.data",
-#           "output1377888015.16297/alpha1cost5run1-means.data",
-#           "output1377888015.16297/alpha5cost1run1-means.data",
-#           "output1377888015.16297/alpha5cost2run1-means.data",
-#           "output1377888015.16297/alpha5cost5run1-means.data",
-#           "output1377888015.16297/alpha10cost1run1-means.data",
-#           "output1377888015.16297/alpha10cost2run1-means.data",
-#           "output1377888015.16297/alpha10cost5run1-means.data"), function(file.name) {
-#   model.means <- read.table(file.name)
-#   expt.means <- avg.data$mp
-#   return(cor(model.means, expt.means))
-# })
-# names(cor) <- c("a1c1", "a1c2", "a1c5", "a5c1", "a5c2", "a5c5", "a10c1", "a10c2", "a10c5")
