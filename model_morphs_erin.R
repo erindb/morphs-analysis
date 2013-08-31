@@ -24,20 +24,20 @@ examples <- list(down.examples, mid.examples, unif.examples)
 names(examples) <- c("down", "mid", "unif")
 possible.utterances = c('no-utt', 'pos', 'very pos') #probably OK since Ss see all of
                                                      #these in same page
-utterance.lengths = c(0,1,2)
+utterance.lengths = c(0,1,3)
 utterance.polarities = c(0,+1,+1)
 
 #using r function density to find kernal density, so it's not actually continuous
 kernel.granularity <- grid.steps #2^12 #how many points are calculated for the kernel density estimate
-est.kernel <- function(dist, bw) {
+est.kernel <- function(dist, bw, adjust) {
   return(density(examples[[dist]], from=0, to=1, n=kernel.granularity,
-                 kernel="gaussian", bw=bw, adjust=1))
+                 kernel="gaussian", bw=bw, adjust=adjust))
 }
 
 #norms the kernel density
 #takes in all the points where kernel density is estimated
 make.pdf.cache <- function(kernel.est) {
-  k = kernel.est$y + 0.00000001
+  k = kernel.est$y + 0.0001
   area <- sum(k) 
   normed.dens <- k/area
   return(normed.dens)
@@ -103,11 +103,11 @@ speaker1 = function(thetas.idx, degree.idx, utterance.idx, alpha, utt.cost, pdf,
 }
 
 listener1 = function(utterance, alpha, utt.cost, n.samples, step.size,
-                     dist, band.width, thetaGtr) {
+                     dist, band.width, thetaGtr, adjust) {
   
   utt.idx = which(possible.utterances == utterance)
   
-  kernel.est <- est.kernel(dist, band.width)
+  kernel.est <- est.kernel(dist, band.width, adjust)
   pdf <- make.pdf.cache(kernel.est)
   cdf <- make.cdf.cache(kernel.est)
     
@@ -169,6 +169,7 @@ listener1 = function(utterance, alpha, utt.cost, n.samples, step.size,
 	return(list(samples=samples, prop.accepted=n.proposals.accepted/(n.samples-1)))
 }
 
+dists <- c("down", "mid", "unif")
 myapply <- function(f) {
   c(sapply(dists, function(dist) {
     return(c(sapply(possible.utterances, function(utterance) {
@@ -236,19 +237,18 @@ kernel.dens.plot <- function(model.runs, label) {
 }
 
 #run model with these values of parameters
-model <- function(alpha, utt.cost, thetaGtr, label) {
-  n.true.samples <- 100#30000 #number of samples to keep
+model <- function(alpha, utt.cost, thetaGtr, label, adjust) {
+  n.true.samples <- 3000#30000 #number of samples to keep
   lag <- 5 #number of samples to skip over
   burn.in <- 10
   n.samples <- n.true.samples * lag + burn.in
   step.size <- 0.03 #note this may not be appropriate for all conditions.
-  dists <- c("down", "mid", "unif")
   
   model.runs <- lapply(dists, function(dist) {
     clear.cache()
     return(lapply(possible.utterances, function(utterance) {
       listener1(utterance, alpha=alpha, utt.cost=utt.cost, n.samples=n.samples,
-                step.size=step.size, dist=dist, band.width="SJ", thetaGtr=thetaGtr)
+                step.size=step.size, dist=dist, band.width="SJ", thetaGtr=thetaGtr, adjust)
     }))
   })
   model.runs <- lapply(model.runs, function(run) {
@@ -277,6 +277,7 @@ model <- function(alpha, utt.cost, thetaGtr, label) {
                            ylab="feppiness", beside=TRUE, col=rainbow(3), ylim=c(0,1))
   legend("topleft", c("wug", "feppy wug", "very feppy wug"), cex=0.6, bty="n", fill=rainbow(3));
   dev.off()
+  return(graph.means)
 }
 
 timestamp <- as.character(unclass(Sys.time()))
@@ -288,17 +289,23 @@ if (!(file.exists(subDir))) {
   dir.create(file.path(mainDir, subDir))
 }
 
-time.label <- function(alpha, cost, i) {
-  return(paste(c("output", timestamp, "/alpha", alpha, "cost", cost,
-                 "run", i), collapse=""))
+time.label <- function(alpha, cost, very.len, adjust, i) {
+  return(paste(c("output", timestamp, "/alpha", alpha, "_cost", cost, "_very.len", very.len,
+                 "_adjust", adjust, "_run", i), collapse=""))
 }
 
+expt.means <- c(0.3774988, 0.2063296, 0.4692256, 0.6403353, 0.5309518, 0.8261740, 0.6875057, 0.5141071, 0.9364525)
 #run the model with different values of free parameters
-sapply(1:10, function(i) {
+sapply(1:1, function(i) {
   sapply(c(1,5,10), function(alpha) {
-    sapply(c(1,2,5), function(cost) {
-      model(alpha=alpha, utt.cost=cost, thetaGtr=F,
-            label=time.label(alpha, cost, i))
+    sapply(c(1), function(cost) {
+      sapply(c(1,2,3,4), function(adjust) {
+      model.means <- model(alpha=alpha, utt.cost=cost, thetaGtr=F,
+                           label=time.label(alpha, cost, 2, adjust, i), adjust)
+      print(paste("Correlation:", cor(model.means, expt.means)))
+      print(paste("adjust:", adjust))
+      print(paste("alpha:", alpha))
+      })
     })
   })
 })
