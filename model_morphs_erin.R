@@ -178,20 +178,36 @@ myapply <- function(f) {
   }))
 }
 
+
+convert.logit <- F
+
 logit <- function(v) {
+  if (convert.logit) {
   return(sapply(v, function(p) {
     return(log(p) - log(1-p))
   }))
+  } else {
+  return(v)
+  }
 }
 
 logistic <- function(v) {
+  if (convert.logit) {
   return(sapply(v, function(x) {
     return(1/(1+exp(-x)))
   }))
+  } else {
+  return(v)
+  }
 }
 
 #horribly messy graph function
-kernel.dens.plot <- function(model.runs, label) {
+kernel.dens.plot <- function(model.runs, label, logitify) {
+  if (logitify) {
+    convert.logit <<- T
+  } else {
+    convert.logit <<- F
+  }
   n.samples <- length(model.runs[["down"]][["no-utt"]][["samples"]][,"degree"])
   distributions <- myapply(function(d,u) {
     return(rep(d, n.samples))
@@ -256,7 +272,8 @@ model <- function(alpha, utt.cost, thetaGtr, label, adjust) {
     return(run)
   })
   names(model.runs) <- dists
-  kernel.dens.plot(model.runs, label)
+  kernel.dens.plot(model.runs, label, logitify=T)
+  kernel.dens.plot(model.runs, label, logitify=F)
   
   graph.dist <- myapply(function(d,u){return(d)})
   graph.utterance <- myapply(function(d,u){return(u)})
@@ -271,7 +288,7 @@ model <- function(alpha, utt.cost, thetaGtr, label, adjust) {
   graph.data <- (matrix(data=graph.means, nrow=3, ncol=3,
                         dimnames=list(c("none", "adj", "very"),
                                       c("peakedDown", "peakedMid", "uniform"))))
-  png(paste(c(label, ".png"), collapse=""))
+  png(paste(c(label, "-logit", logitify ,".png"), collapse=""), 1200, 800, pointsize=32)
   graph.title <- paste(c("model alpha=", alpha, ", cost=", utt.cost), collapse="")
   novel.adj.bar <- barplot(as.matrix(graph.data), main=graph.title,
                            ylab="feppiness", beside=TRUE, col=rainbow(3), ylim=c(0,1))
@@ -293,8 +310,6 @@ time.label <- function(alpha, cost, very.len, adjust, i) {
   return(paste(c("output", timestamp, "/alpha", alpha, "_cost", cost, "_very.len", very.len,
                  "_adjust", adjust, "_run", i), collapse=""))
 }
-
-convert.logit <- F
 
 expt.means <- c(0.3774988, 0.2063296, 0.4692256, 0.6403353, 0.5309518, 0.8261740, 0.6875057, 0.5141071, 0.9364525)
 #run the model with different values of free parameters
