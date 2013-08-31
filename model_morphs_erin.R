@@ -220,7 +220,7 @@ kernel.dens.plot <- function(model.runs, label, logitify) {
     return(df[["samples"]][,"degree"])
   })
   mydata <- data.frame(dist=distributions, mod=modifiers, mp=mp)
-  png(paste(c(label, "-kernel-dens-est.png"), collapse=""), 2200, 1500, pointsize=32)
+  png(paste(c(label, "logit", logitify, "-kernel-dens-est.png"), collapse=""), 2200, 1500, pointsize=32)
   par(mfrow=c(3,4))
   lapply(dists, function(d) {
     f <- density(logit(examples[[d]]), kernel="gaussian", bw="sj")
@@ -254,7 +254,7 @@ kernel.dens.plot <- function(model.runs, label, logitify) {
 
 #run model with these values of parameters
 model <- function(alpha, utt.cost, thetaGtr, label, adjust) {
-  n.true.samples <- 10#3000#30000 #number of samples to keep
+  n.true.samples <- 3000#30000 #number of samples to keep
   lag <- 5 #number of samples to skip over
   burn.in <- 10
   n.samples <- n.true.samples * lag + burn.in
@@ -288,7 +288,7 @@ model <- function(alpha, utt.cost, thetaGtr, label, adjust) {
   graph.data <- (matrix(data=graph.means, nrow=3, ncol=3,
                         dimnames=list(c("none", "adj", "very"),
                                       c("peakedDown", "peakedMid", "uniform"))))
-  png(paste(c(label, "-logit", logitify ,".png"), collapse=""), 1200, 800, pointsize=32)
+  png(paste(c(label, ".png"), collapse=""), 1200, 800, pointsize=32)
   graph.title <- paste(c("model alpha=", alpha, ", cost=", utt.cost), collapse="")
   novel.adj.bar <- barplot(as.matrix(graph.data), main=graph.title,
                            ylab="feppiness", beside=TRUE, col=rainbow(3), ylim=c(0,1))
