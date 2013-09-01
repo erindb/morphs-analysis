@@ -2,8 +2,24 @@
 #install.packages(c("R.basic"), contriburl="http://www.braju.com/R/repos/")
 library(rjson)
 library(stats)
+require(logspline)
 #library(plyr)
 #library(R.basic)
+
+
+mylogspline <- function(s) {
+  nsamp <- length(s)
+  interval <- matrix(c(rep(0,nsamp), rep(1,nsamp)), ncol=2, nrow=nsamp)
+  return(oldlogspline.to.logspline(
+    oldlogspline(
+      s,
+      interval=interval,
+      lbound=0,
+      ubound=1,
+      nknots=5)))}
+# mylogspline <- function(s) {
+#   return(logspline(s, lbound=0, ubound=1, nknots=5, maxknots=5))
+# }
 
 #get rid of first and last quotes. for some reason there are a bunch in my data :/ oops!
 cutQuotes <- function(quoteyString) {
@@ -13,7 +29,7 @@ cutQuotes <- function(quoteyString) {
 }
 
 ################# reading and cleaning data for all pieces
-setwd("~/Code/cocolab/analyzing_experiments/morphs-analysis/")  ###change this to actual location of repo
+#setwd("~/morphs-analysis/")  ###change this to actual location of repo
 rd <- read.table("morphs.results", sep="\t", quote='"', header=TRUE)
 
 adjectives <- lapply(as.character(rd$Answer.adjective), cutQuotes)
@@ -60,7 +76,7 @@ targets <- lapply(as.character(rd$Answer.target), fromJSON)
 ntargets <- length(targets)
 
 # #create levels for the columns of the target data frame
-# dist.levels <- c("down", "mid", "unif")
+dist.levels <- c("down", "mid", "unif")
 mod.levels <- c("none", "adj", "very")
 
 distributions <- c(sapply(1:ntargets, function(i){
@@ -146,6 +162,10 @@ levels(type.col) <- c("compare", "classify")
 #levels(correctness.col) <- c("correct", "incorrect", NA)
 levels(order.col) <- c("01", "10", "LM", "ML")
 levels(response.col) <- c("left", "right", "down", "mid", "unif")
+lowerdist.col=factor(nrow)
+higherdist.col=factor(nrow)
+levels(lowerdist.col) <- dist.levels
+levels(higherdist.col) <- dist.levels
 
 #create target data frame
 warmup.data <- data.frame(subj=subj.col, #worker id
@@ -160,14 +180,14 @@ warmup.data <- data.frame(subj=subj.col, #worker id
                           #Order is from left to right and it represents the
                           #order in which the buttons were displayed on screen
                           class.mp=numeric(nrow), #morp proportion for shape in
-                                                  #classify-type warmup question
+                          #classify-type warmup question
                           left.mp=numeric(nrow), #morph proportion for left shape
-                                                 #in compare-type warmup question
+                          #in compare-type warmup question
                           right.mp=numeric(nrow), #morph proportion for right shape
-                                                  #in compare-type warmup question
+                          #in compare-type warmup question
                           response=response.col,
-                          lowerdist=character(nrow),
-                          higherdist=character(nrow)
+                          lowerdist=lowerdist.col,
+                          higherdist=higherdist.col
 )
 
 index <- 1
@@ -229,42 +249,50 @@ exclusion.list <- c(exclusion.list, as.character(avg.correct$Group.1[avg.correct
 
 # # how well they did on the obvious ones
 # obvious.compare <- c(0.15, 0.55, 0.45, 0.85)
-# obvious.class <- c(0.52, 0.92)
+obvious.class <- c(0.52, 0.92)
 # obv.compare.ind <- warmup.data$type=="compare" & (is.element(warmup.data$left.mp, obvious.compare))
-# obv.class.ind <- warmup.data$type=="classify" & (sapply(1:length(warmup.data$class.mp), function(i) {
-#   return(is.element(warmup.data$class.mp[[i]], obvious.class))
-# }))
-# class.correct <- sapply(1:nrow(warmup.data), function(i) {
-#   class.mp <- as.numeric(warmup.data$class.mp)[[i]]
-#   if (is.na(class.mp) || !(is.element(class.mp, obvious.class))) {
-#     return(NA)
-#   } else {
-#     response <- warmup.data$response[[i]]
-#     higher <- warmup.data$higherdist
-#     lower <- warmup.data$lowerdist
-#     if (class.mp == 0.52) {
-#       correct.class <- "down"
-#     } else if (class.mp == 0.92) {
-#       correct.class <- higher
-#     } else {
-#       print("error7")
-#     }
-#     if (response == correct.class) {
-#       return(1)
-#     } else {
-#       return(0)
-#     }
-#   }
-# })
-# warmup.data$class.correct <- class.correct
-# avg.obvious.compare.correct <- aggregate(x=as.numeric(warmup.data$correctness)[obv.compare.ind],
-#                                          by=list(warmup.data$subj[obv.compare.ind]), FUN="mean")
-# avg.obvious.class.correct <- aggregate(x=as.numeric(warmup.data$class.correct)[obv.class.ind],
-#                                        by=list(warmup.data$subj[obv.class.ind]), FUN="mean")
-
-# based on reaction time
-
-#good data
+obv.class.ind <- warmup.data$type=="classify" & (sapply(1:length(warmup.data$class.mp), function(i) {
+  return(is.element(warmup.data$class.mp[[i]], obvious.class))
+}))
+class.correct <- sapply(1:nrow(warmup.data), function(i) {
+  class.mp <- as.numeric(warmup.data$class.mp)[[i]]
+  if (is.na(class.mp) || !(is.element(class.mp, obvious.class))) {
+    return(NA)
+  } else {
+    response <- as.character(warmup.data$response[[i]])
+    higher <- as.character(warmup.data$higherdist[[i]])
+    lower <- as.character(warmup.data$lowerdist[[i]])
+    if (class.mp == 0.52) {
+      if (lower == "down") {
+        correct.class <- higher
+      } else {
+        correct.class <- "mid"
+      }
+    } else if (class.mp == 0.92) {
+      if (lower == "down") {
+        correct.class <- higher
+      } else {
+        correct.class <- "unif"
+      }
+    } else {
+      print("error7")
+    }
+    if (response == correct.class) {
+      return(1)
+    } else {
+      return(0)
+    }
+  }
+})
+warmup.data$class.correct <- class.correct
+# # avg.obvious.compare.correct <- aggregate(x=as.numeric(warmup.data$correctness)[obv.compare.ind],
+# #                                          by=list(warmup.data$subj[obv.compare.ind]), FUN="mean")
+avg.obvious.class.correct <- aggregate(x=as.numeric(warmup.data$class.correct)[obv.class.ind],
+                                       by=list(warmup.data$subj[obv.class.ind]), FUN="mean")
+exclusion.list <- c(exclusion.list, as.character(avg.obvious.class.correct$Group.1[avg.obvious.class.correct$x < 0.5]))
+# # based on reaction time
+# 
+# #good data
 exclusion.list <- unique(exclusion.list)
 good.subjects <- subjects[!(is.element(subjects, exclusion.list))]
 
@@ -272,45 +300,45 @@ good.data <- target.data[(is.element(target.data$subj, good.subjects)),]
 good.data$mp <- as.numeric(good.data$mp)
 good.data$rt <- as.numeric(good.data$rt)
 
-# ################ z scores
-z.mp <- c(sapply(good.subjects, function(s) {
-    subj.data <- subset(good.data, good.data$subj==s)
-    return(scale(subj.data$mp))
-}))
-z.subj <- c(sapply(good.subjects, function(s) {
-  return(rep(s, 6))
-}))
-z.dist <- c(sapply(good.subjects, function(s) {
-  subj.data <- subset(good.data, good.data$subj==s)
-  return(subj.data$dist)
-}))
-z.mod <- c(sapply(good.subjects, function(s) {
-  subj.data <- subset(good.data, good.data$subj==s)
-  return(subj.data$mod)
-}))
-z.other.dist <- c(sapply(good.subjects, function(s) {
-  subj.data <- subset(good.data, good.data$subj==s)
-  return(subj.data$other.dist)
-}))
-z.data <- data.frame(subj=z.subj, dist=z.dist, mod=z.mod, mp=z.mp, other.dist=z.other.dist)
+# # ################ z scores
+# z.mp <- c(sapply(good.subjects, function(s) {
+#   subj.data <- subset(good.data, good.data$subj==s)
+#   return(scale(subj.data$mp))
+# }))
+# z.subj <- c(sapply(good.subjects, function(s) {
+#   return(rep(s, 6))
+# }))
+# z.dist <- c(sapply(good.subjects, function(s) {
+#   subj.data <- subset(good.data, good.data$subj==s)
+#   return(subj.data$dist)
+# }))
+# z.mod <- c(sapply(good.subjects, function(s) {
+#   subj.data <- subset(good.data, good.data$subj==s)
+#   return(subj.data$mod)
+# }))
+# z.other.dist <- c(sapply(good.subjects, function(s) {
+#   subj.data <- subset(good.data, good.data$subj==s)
+#   return(subj.data$other.dist)
+# }))
+# z.data <- data.frame(subj=z.subj, dist=z.dist, mod=z.mod, mp=z.mp, other.dist=z.other.dist)
 # 
-################ anovas
-raw.lm <- lm(mp ~ dist*mod, data=good.data)
-raw.anova <- anova(raw.lm)#aov(mp ~ dist*mod, data=good.data)
-print(raw.anova)
-
-othercat.lm <- lm(mp ~ dist*mod*other.dist, data=good.data)
-othercat.anova <- anova(othercat.lm)
-print(othercat.anova)
-
-z.lm <- lm(mp ~ dist*mod, data=z.data)
-z.anova <- anova(z.lm)#aov(mp ~ dist*mod, data=good.data)
-print("z-scored:")
-print(z.anova)
-
-zothercat.lm <- lm(mp ~ dist*mod*other.dist, data=z.data)
-zothercat.anova <- anova(zothercat.lm)
-print(zothercat.anova)
+# ################ anovas
+# raw.lm <- lm(mp ~ dist*mod, data=good.data)
+# raw.anova <- anova(raw.lm)#aov(mp ~ dist*mod, data=good.data)
+# print(raw.anova)
+# 
+# othercat.lm <- lm(mp ~ dist*mod*other.dist, data=good.data)
+# othercat.anova <- anova(othercat.lm)
+# print(othercat.anova)
+# 
+# z.lm <- lm(mp ~ dist*mod, data=z.data)
+# z.anova <- anova(z.lm)#aov(mp ~ dist*mod, data=good.data)
+# print("z-scored:")
+# print(z.anova)
+# 
+# zothercat.lm <- lm(mp ~ dist*mod*other.dist, data=z.data)
+# zothercat.anova <- anova(zothercat.lm)
+# print(zothercat.anova)
 
 dists <- c("down", "mid", "unif")
 mods <- c("none", "adj", "very")
@@ -325,8 +353,8 @@ mygraph <- function(mydata, range, mytitle) {
   }))
   
   graph.data <- (matrix(data=unlist(mp), nrow=3, ncol=3,
-                       dimnames=list(c("none", "adj", "very"),
-                                     c("peakedDown", "peakedMid", "uniform"))))
+                        dimnames=list(c("none", "adj", "very"),
+                                      c("peakedDown", "peakedMid", "uniform"))))
   novel.adj.bar <- barplot(as.matrix(graph.data), main=mytitle, font.main=12,
                            ylab="feppiness", beside=TRUE, col=rainbow(3), ylim=range)
   legend("topleft", c("wug", "feppy wug", "very feppy wug"), cex=0.6, bty="n", fill=rainbow(3));
@@ -348,11 +376,11 @@ mygraph <- function(mydata, range, mytitle) {
     return(c(sapply(conf.list, function(conf.pair) {return(conf.pair[2])})))
   }))
   lower <- (matrix(data=conf.low, nrow=3, ncol=3,
-                        dimnames=list(c("none", "adj", "very"),
-                                      c("peakedDown", "peakedMid", "uniform"))))
+                   dimnames=list(c("none", "adj", "very"),
+                                 c("peakedDown", "peakedMid", "uniform"))))
   higher <- (matrix(data=conf.high, nrow=3, ncol=3,
-                        dimnames=list(c("none", "adj", "very"),
-                                      c("peakedDown", "peakedMid", "uniform"))))
+                    dimnames=list(c("none", "adj", "very"),
+                                  c("peakedDown", "peakedMid", "uniform"))))
   error.bar(novel.adj.bar, as.matrix(graph.data), higher, lower)
   colnames(lower) <- c("down", "mid", "unif")
   colnames(higher) <- c("down", "mid", "unif")
@@ -362,7 +390,7 @@ mygraph <- function(mydata, range, mytitle) {
 }
 
 png("morphs-bar.png", 1200, 800, pointsize=32)
-conf <- mygraph(good.data, c(0,1), "Novel Adjective Experiment")
+conf <- mygraph(good.data, c(0,1), "Novel Adj Scale")
 dev.off()
 png("morphs-bar-zscores.png", 1200, 800, pointsize=32)
 z.conf <- mygraph(z.data, c(-1.5,1.5), "Novel Adj Scale (z-scored)")
@@ -382,60 +410,60 @@ unif.examples <- c(0.9730805, 0.0589135, 0.1332413, 0.5568001, 0.6201130, 0.4243
 examples <- list(down.examples, mid.examples, unif.examples)
 names(examples) <- c("down", "mid", "unif")
 
-my.bw <- "sj"
+bw <- "sj"
 #k.type <- "epanechnikov"
 #k.type <- "biweight"
-#k.type <- "gaussian"
+k.type <- "gaussian"
 
-convert.logit <- F
 
-logit <- function(v) {
-  if (convert.logit) {
-    return(sapply(v, function(p) {
-      return(log(p) - log(1-p))
-    }))
+conf.plot <- function(samples, color, d, m) {
+  if (color == 'blue') {
+    line.color <- 'blue4'
+  } else if (color == 'green') {
+    line.color <- 'green4'
   } else {
-    return(v)
+    line.color <- 'black'
   }
+  f <- list()
+  f$x <- seq(0,1,length.out=512)
+  f$y <- dlogspline(f$x, mylogspline(samples))
+  fit2 <- replicate(100, { new.samples <- sample(samples, replace=TRUE); 
+                            dlogspline(f$x, mylogspline(new.samples))})
+  fit3 <- apply(fit2, 1, quantile, c(0.025,0.975) )
+  plot(f$x, f$y/sum(f$y)*512, ylim=c(0,max(f$y)/sum(f$y)*512*1.5), type="l", ylab="",
+                                     xlab="", col=line.color, lwd=3, yaxt='n')
+#   plot(f$x, f$y/sum(f$y)*512, ylim=range(fit3), type="l", ylab="", xlab="", yaxt='n')
+  if (color == 'blue') {
+  polygon( c(f$x, rev(f$x)), c(fit3[1,]/sum(f$y)*512, rev(fit3[2,]/sum(f$y)*512)),
+           col=rgb(0,0,1,0.3))
+  } else if (color == 'green') {
+    polygon( c(f$x, rev(f$x)), c(fit3[1,]/sum(f$y)*512, rev(fit3[2,]/sum(f$y)*512)),
+             col=rgb(0,1,0,0.3))
+  } else {
+    polygon( c(f$x, rev(f$x)), c(fit3[1,]/sum(f$y)*512, rev(fit3[2,]/sum(f$y)*512)),
+             col=rgb(0,0,0,0.3))
+  }
+  lines(f$x, f$y/sum(f$y)*512, col=line.color)
 }
 
-logistic <- function(v) {
-  if (convert.logit) {
-    return(sapply(v, function(x) {
-      return(1/(1+exp(-x)))
-    }))
-  } else {
-    return(v)
-  }
-}
-
-kernel.dense.plot <- function(mydata, label="", logit, c, range) {
-  png(paste(c(label, "morphs-kernel-density-estimates.png"), collapse=""), 2200, 1500, pointsize=32)
+kernel.dense.plot <- function(mydata, label="", c, range) {
+  png(paste(c(label, "morphs-kernel-density-estimates.png"), collapse=""), 2200, 1500, pointsize=40)
   par(mfrow=c(3,4))
   lapply(dists, function(d) {
-    #convert.logit <- T
-    
-    down.examples <- c(0.04583, 0.003231, 0.07391, 0.01884, 0.00003024, 0.04158,
-                       0.09081, 0.06746, 0.01949, 0.1007, 0.1633, 0.1441, 0.1655,
-                       0.2697, 0.2161)
-    mid.examples <- c(0.31404, 0.30456, 0.39520, 0.56064, 0.49728, 0.53187, 0.55993,
-                      0.47519, 0.54332, 0.48362, 0.51678, 0.44763, 0.68272, 0.61375,
-                      0.69832)
-    unif.examples <- c(0.9730805, 0.0589135, 0.1332413, 0.5568001, 0.6201130, 0.4243146,
-                       0.4176713, 0.2215742, 0.6778150, 0.6834636, 0.8716204, 0.5641932,
-                       0.3503760, 0.9606276, 0.0048311)
-    examples <- list(down.examples, mid.examples, unif.examples)
-    names(examples) <- c("down", "mid", "unif")
-    f <- density(logit(examples[[d]]), kernel="gaussian", bw="sj")
+    #f <- density(logit(examples[[d]]), kernel=k.type, bw=bw)
+    f <- list()
+    f$x <- seq(0,1,length.out=512)
+    f$y <- dlogspline(f$x, mylogspline(examples[[d]]))
+    f$y <- f$y/sum(f$y)*512 #normalize
     if (d == "unif") {
       xlab <- "feppiness"
-      ylab <- "density"
+      ylab <- ""#"density"
     } else {
       xlab=""
       ylab=""
     }
-    plot(logistic(f$x), f$y, type="l", main="", xlab=xlab, ylab=ylab, xlim=c(0,1),
-         font.main=32, lwd=3)
+    plot(f$x, f$y, type="l", main="", xlab=xlab, ylab=ylab, xlim=c(0,1),
+         font.main=32, lwd=3, yaxt="n")
     lapply(mods, function(m) {
       if (d == "unif" && m == "none") {
         xlab <- "feppiness"
@@ -444,41 +472,21 @@ kernel.dense.plot <- function(mydata, label="", logit, c, range) {
         xlab=""
         ylab=""
       }
-#       if (logit) {
-#         convert.logit <- T
-#       } else {
-#         convert.logit <- F
-#       }
       otherdists <- dists[dists != d]
-      samples <- mydata$mp[mydata$dist == d & mydata$mod == m]
-      f <- density(logit(samples), kernel="gaussian", bw="sj")
-      plot(logistic(f$x), f$y, type="l", main="", ylab=ylab, xlab=xlab, xlim=range,
-           font.main=32, lwd=3, col="blue")
-#       samples <- mydata$mp[mydata$dist == d & mydata$mod == m &
-#                              mydata$other.dist == otherdists[1]]
-# #       low <- c[["low"]][[m, d]]
-# #       high <- c[["high"]][[m, d]]
-#       f <- density(logit(samples), kernel="gaussian", bw="sj")
-#       plot(logistic(f$x), f$y, type="l", main="", ylab=ylab, xlab=xlab, xlim=range,
-#            font.main=32, lwd=3, col="blue")
-#       mu <- mean(samples)
-#       abline(v = mu, col="blue", lwd=7)
-#       #arrows(low, max(f$y)/2, x1=high, lwd=5, code=3, angle=90)
-#       par(new=T)
-#       samples <- mydata$mp[mydata$dist == d & mydata$mod == m &
-#                              mydata$other.dist == otherdists[2]]
-# #       low <- c[["low"]][[m, d]]
-# #       high <- c[["high"]][[m, d]]
-#       f <- density(logit(samples), kernel="gaussian", bw="sj")
-#       plot(logistic(f$x), f$y, type="l", main="", ylab=ylab, xlab=xlab, xlim=range,
-#            font.main=32, lwd=3, col="green")
-#       mu <- mean(samples)
-#       abline(v = mu, col="green", lwd=7)
-#       #arrows(low, max(f$y)/2, x1=high, lwd=5, code=3, angle=90)
+      lower.samples <- mydata$mp[mydata$dist == d & mydata$mod == m  &
+                                 mydata$other.dist == otherdists[1]]
+#      samples <- mydata$mp[mydata$dist == d & mydata$mod == m]
+#      conf.plot(samples, 'gray', 'black')
+      conf.plot(lower.samples, 'blue')
+      higher.samples <- mydata$mp[mydata$dist == d & mydata$mod == m  &
+                                  mydata$other.dist == otherdists[2]]
+      par(new=T)
+      conf.plot(higher.samples, 'green')
+      legend("topleft", c(paste("against", otherdists[1]), paste("against", otherdists[2])), cex=0.6, bty="n", fill=c('blue', 'green3'));
     })
   })
   dev.off()
 }
 
-kernel.dense.plot(good.data, "", logit=T, c=conf, range=c(0,1))
-kernel.dense.plot(z.data, "z-", logit=F, c=z.conf, range=c(-1.5, 1.5))
+kernel.dense.plot(good.data, "", c=conf, range=c(0,1))
+#kernel.dense.plot(z.data, "z-", logit=F, c=z.conf, range=c(-1.5, 1.5))

@@ -2,8 +2,9 @@ wd <- "~/morphs-analysis/"
 setwd(wd)
 
 library(stats)
+require(logspline)
 
-#for speaker1 discretization:
+#for discretization:
 grid.steps = 64
 grid = seq(0,1,length.out=grid.steps)
 cache.index = function(v) {
@@ -27,26 +28,27 @@ possible.utterances = c('no-utt', 'pos', 'very pos') #probably OK since Ss see a
 utterance.lengths = c(0,1,5)
 utterance.polarities = c(0,+1,+1)
 
-#using r function density to find kernal density, so it's not actually continuous
-kernel.granularity <- grid.steps #2^12 #how many points are calculated for the kernel density estimate
-est.kernel <- function(dist, bw, adjust) {
-  return(density(examples[[dist]], from=0, to=1, n=kernel.granularity,
-                 kernel="gaussian", bw=bw, adjust=adjust))
-}
+
+# kernel.granularity <- grid.steps #2^12 #how many points are calculated for the kernel density estimate
+# est.kernel <- function(dist, bw, adjust) {
+#   return(density(examples[[dist]], from=0, to=1, n=kernel.granularity,
+#                  kernel="gaussian", bw=bw, adjust=adjust))
+# }
 
 #norms the kernel density
-#takes in all the points where kernel density is estimated
-make.pdf.cache <- function(kernel.est) {
-  k = kernel.est$y + 0.0001
-  area <- sum(k) 
-  normed.dens <- k/area
-  return(normed.dens)
+#using logspline to fit density (respects boundaries)
+make.pdf.cache <- function(dist) {
+  k <- dlogspline(grid, logspline(dist, lbound=0,ubound=1))
+  k <- k/sum(k) #normalize
+  k <- k+0.0001 #regularize away from 0 (in prob units)
+  k <- k/sum(k) #then normalize again
+  return(k)
 }
 
 #creates fn that approximates percentage of area before x
 #takes in all the points where kernel density is estimated
-make.cdf.cache <- function(kernel.est) {
-  cumulants <- cumsum(make.pdf.cache(kernel.est))
+make.cdf.cache <- function(dist) {
+  cumulants <- cumsum(make.pdf.cache(dist))
   return(cumulants)
 }
 
@@ -107,9 +109,9 @@ listener1 = function(utterance, alpha, utt.cost, n.samples, step.size,
   
   utt.idx = which(possible.utterances == utterance)
   
-  kernel.est <- est.kernel(dist, band.width, adjust)
-  pdf <- make.pdf.cache(kernel.est)
-  cdf <- make.cdf.cache(kernel.est)
+  #kernel.est <- est.kernel(dist, band.width, adjust)
+  pdf <- make.pdf.cache(examples[[dist]])
+  cdf <- make.cdf.cache(examples[[dist]])
   
   dim1 <- paste('samp', 1:n.samples, sep='')
   dim2 <- c('degree', paste('theta.', possible.utterances[-1], sep=''))
@@ -223,7 +225,9 @@ kernel.dens.plot <- function(model.runs, label, logitify) {
   png(paste(c(label, "logit", logitify, "-kernel-dens-est.png"), collapse=""), 2200, 1500, pointsize=32)
   par(mfrow=c(3,4))
   lapply(dists, function(d) {
-    f <- density(logit(examples[[d]]), kernel="gaussian", bw="sj")
+    #f <- density(logit(examples[[d]]), kernel="gaussian", bw="sj")
+    f$x <- seq(0,1,length.out=512)
+    f$y <- dlogspline(f$x, logspline(examples[[d]], lbound=0,ubound=1))
     #     if (d == "unif") {
     #       xlab <- "feppiness"
     #       ylab <- "density"
@@ -231,7 +235,7 @@ kernel.dens.plot <- function(model.runs, label, logitify) {
     xlab=""
     ylab=""
     #     }
-    plot(logistic(f$x), f$y, type="l", main="", xlab=xlab, ylab=ylab, xlim=c(0,1),
+    plot(logistic(f$x), f$y, type="l", main="", xlab=xlab, ylab=ylab, xlim=c(0,1), #ylim=c(0,length(f$x)),
          font.main=32, lwd=3)
     lapply(possible.utterances, function(m) {
       #       if (d == "unif" && m == "no-utt") {
@@ -242,8 +246,10 @@ kernel.dens.plot <- function(model.runs, label, logitify) {
       ylab=""
       #       }
       samples <- mydata$mp[mydata$dist == d & mydata$mod == m]
-      f <- density(logit(samples), kernel="gaussian", bw="sj")
-      plot(logistic(f$x), f$y, type="l", main="", ylab=ylab, xlab=xlab, xlim=c(0,1),
+      #f <- density(logit(samples), kernel="gaussian", bw="sj")
+      f$x <- seq(0,1,length.out=512)
+      f$y <- dlogspline(f$x, logspline(samples, lbound=0,ubound=1))
+      plot(logistic(f$x), f$y, type="l", main="", ylab=ylab, xlab=xlab, xlim=c(0,1), #ylim=c(0,length(f$x)),
            font.main=32, lwd=3)
       mu <- mean(samples)
       abline(v = mu, col="blue", lwd=7)
@@ -272,7 +278,7 @@ model <- function(alpha, utt.cost, thetaGtr, label, adjust) {
     return(run)
   })
   names(model.runs) <- dists
-  kernel.dens.plot(model.runs, label, logitify=T)
+  #kernel.dens.plot(model.runs, label, logitify=T)
   kernel.dens.plot(model.runs, label, logitify=F)
   
   graph.dist <- myapply(function(d,u){return(d)})
