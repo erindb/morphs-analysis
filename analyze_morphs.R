@@ -392,9 +392,9 @@ mygraph <- function(mydata, range, mytitle) {
 png("morphs-bar.png", 1200, 800, pointsize=32)
 conf <- mygraph(good.data, c(0,1), "Novel Adj Scale")
 dev.off()
-png("morphs-bar-zscores.png", 1200, 800, pointsize=32)
-z.conf <- mygraph(z.data, c(-1.5,1.5), "Novel Adj Scale (z-scored)")
-dev.off()
+# png("morphs-bar-zscores.png", 1200, 800, pointsize=32)
+# z.conf <- mygraph(z.data, c(-1.5,1.5), "Novel Adj Scale (z-scored)")
+# dev.off()
 
 
 
@@ -472,17 +472,17 @@ kernel.dense.plot <- function(mydata, label="", c, range) {
         xlab=""
         ylab=""
       }
-      otherdists <- dists[dists != d]
-      lower.samples <- mydata$mp[mydata$dist == d & mydata$mod == m  &
-                                 mydata$other.dist == otherdists[1]]
-#      samples <- mydata$mp[mydata$dist == d & mydata$mod == m]
-#      conf.plot(samples, 'gray', 'black')
-      conf.plot(lower.samples, 'blue')
-      higher.samples <- mydata$mp[mydata$dist == d & mydata$mod == m  &
-                                  mydata$other.dist == otherdists[2]]
-      par(new=T)
-      conf.plot(higher.samples, 'green')
-      legend("topleft", c(paste("against", otherdists[1]), paste("against", otherdists[2])), cex=0.6, bty="n", fill=c('blue', 'green3'));
+#       otherdists <- dists[dists != d]
+#       lower.samples <- mydata$mp[mydata$dist == d & mydata$mod == m  &
+#                                  mydata$other.dist == otherdists[1]]
+     samples <- mydata$mp[mydata$dist == d & mydata$mod == m]
+     conf.plot(samples, 'gray', 'black')
+#       conf.plot(lower.samples, 'blue')
+#       higher.samples <- mydata$mp[mydata$dist == d & mydata$mod == m  &
+#                                   mydata$other.dist == otherdists[2]]
+#       par(new=T)
+#       conf.plot(higher.samples, 'green')
+#       legend("topleft", c(paste("against", otherdists[1]), paste("against", otherdists[2])), cex=0.6, bty="n", fill=c('blue', 'green3'));
     })
   })
   dev.off()
